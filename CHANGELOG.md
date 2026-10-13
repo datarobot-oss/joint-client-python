@@ -10,6 +10,13 @@ Releases are cut with `task release`, which uses Commitizen to read
 release tag, infer the next SemVer bump, prepend the new section here,
 commit the bump, and create an annotated tag.
 
+## v0.12.0 (2026-10-13)
+
+### Feat
+
+- Update health payload and pool client to use instance_id and new time index encoding
+- Add a local instance pool selector and name pool peers by instance_id (#22)
+
 ## v0.11.0 (2026-10-06)
 
 ### Feat
