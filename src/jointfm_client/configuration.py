@@ -59,6 +59,7 @@ class EnvironmentVariableConfig(_ConfigModel):
     predict_url: str = "JOINTFM_PREDICT_URL"
     deployment_target: str = "JOINTFM_DEPLOYMENT_TARGET"
     local_base_url: str = "JOINTFM_LOCAL_BASE_URL"
+    local_base_urls: str = "JOINTFM_LOCAL_BASE_URLS"
     pulumi_outputs_path: str = "JOINTFM_PULUMI_OUTPUTS_PATH"
     schema_version: str = "JOINTFM_SCHEMA_VERSION"
     model_version: str = "JOINTFM_MODEL_VERSION"
@@ -76,14 +77,18 @@ class EnvironmentVariableConfig(_ConfigModel):
             )
         return value
 
-    def deployment_selector_names(self) -> tuple[str, str, str, str, str]:
-        """Return the environment names that select one service target."""
+    def deployment_selector_names(
+        self,
+    ) -> tuple[str, str, str, str, str, str, str]:
+        """Return the environment names that select a service target or pool."""
         return (
             self.deployment_id,
+            self.deployment_ids,
             self.deployment_url,
             self.predict_url,
             self.deployment_target,
             self.local_base_url,
+            self.local_base_urls,
         )
 
 
@@ -98,6 +103,7 @@ class HostedDeploymentConfig(_ConfigModel):
     predict_url: str | None = None
     deployment_target: str | None = None
     local_base_url: str | None = None
+    local_base_urls: str | None = None
     pulumi_outputs_path: str | None = None
     schema_version: str | None = None
     model_version: str | None = None
@@ -122,6 +128,7 @@ class HostedDeploymentConfig(_ConfigModel):
             values, environment.deployment_target, self.deployment_target
         )
         _set_if_configured(values, environment.local_base_url, self.local_base_url)
+        _set_if_configured(values, environment.local_base_urls, self.local_base_urls)
         _set_if_configured(
             values, environment.pulumi_outputs_path, self.pulumi_outputs_path
         )
@@ -363,6 +370,7 @@ JOINTFM_DEPLOYMENT_URL_ENV: Final = DEFAULT_ENVIRONMENT_CONFIG.deployment_url
 JOINTFM_PREDICT_URL_ENV: Final = DEFAULT_ENVIRONMENT_CONFIG.predict_url
 JOINTFM_DEPLOYMENT_TARGET_ENV: Final = DEFAULT_ENVIRONMENT_CONFIG.deployment_target
 JOINTFM_LOCAL_BASE_URL_ENV: Final = DEFAULT_ENVIRONMENT_CONFIG.local_base_url
+JOINTFM_LOCAL_BASE_URLS_ENV: Final = DEFAULT_ENVIRONMENT_CONFIG.local_base_urls
 JOINTFM_PULUMI_OUTPUTS_PATH_ENV: Final = DEFAULT_ENVIRONMENT_CONFIG.pulumi_outputs_path
 JOINTFM_SCHEMA_VERSION_ENV: Final = DEFAULT_ENVIRONMENT_CONFIG.schema_version
 JOINTFM_MODEL_VERSION_ENV: Final = DEFAULT_ENVIRONMENT_CONFIG.model_version
@@ -441,6 +449,7 @@ __all__ = [
     "JOINTFM_DEPLOYMENT_TARGET_ENV",
     "JOINTFM_DEPLOYMENT_URL_ENV",
     "JOINTFM_LOCAL_BASE_URL_ENV",
+    "JOINTFM_LOCAL_BASE_URLS_ENV",
     "JOINTFM_MODEL_VERSION_ENV",
     "JOINTFM_PREDICT_URL_ENV",
     "JOINTFM_PULUMI_OUTPUTS_PATH_ENV",

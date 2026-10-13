@@ -36,6 +36,7 @@ from jointfm_client.configuration import (
     JOINTFM_DEPLOYMENT_TARGET_ENV,
     JOINTFM_DEPLOYMENT_URL_ENV,
     JOINTFM_LOCAL_BASE_URL_ENV,
+    JOINTFM_LOCAL_BASE_URLS_ENV,
     JOINTFM_MODEL_VERSION_ENV,
     JOINTFM_PREDICT_URL_ENV,
     JOINTFM_PULUMI_OUTPUTS_PATH_ENV,
@@ -58,14 +59,24 @@ DeploymentSelector: TypeAlias = Literal[
     "predict_url",
     "pulumi_target",
     "local_service",
+    "local_services",
 ]
+
+_LOCAL_DEPLOYMENT_SELECTORS: frozenset[DeploymentSelector] = frozenset(
+    {"local_service", "local_services"}
+)
 
 
 @dataclass(frozen=True, slots=True)
 class JointFMInstanceSettings:
-    """One hosted JointFM deployment target in a load-balanced pool."""
+    """One JointFM service target in a load-balanced pool.
 
-    deployment_id: str
+    ``instance_id`` names the peer for routing, health accounting, and
+    :meth:`JointFMClient.endpoint_client`: the deployment ID of a hosted
+    deployment, or the normalized base URL of a local service.
+    """
+
+    instance_id: str
     predict_url: str
 
 
@@ -85,6 +96,20 @@ class JointFMSettings:
     deployment_url: str | None = None
     deployment_target: str | None = None
     local_base_url: str | None = None
+
+    @property
+    def is_local(self) -> bool:
+        """Return whether the target is a local service reached without DataRobot."""
+        return self.deployment_selector in _LOCAL_DEPLOYMENT_SELECTORS
+
+    @property
+    def instance_id(self) -> str | None:
+        """Return the identifier of the single target, as a pool instance names it.
+
+        That is the local base URL for a local service and the deployment ID
+        for a hosted deployment; a pool reports its first instance.
+        """
+        return self.local_base_url if self.is_local else self.deployment_id
 
 
 def load_settings(
@@ -107,9 +132,9 @@ def load_settings(
         _required_env(env_values, environment.schema_version)
     )
     model_version = _optional_model_version(env_values, environment.model_version)
-    deployment_ids_value = env_values.get(environment.deployment_ids)
-    if deployment_ids_value is not None and deployment_ids_value != "":
-        _reject_conflicting_selectors_with_deployment_ids(env_values, environment)
+    selector_name = _resolve_deployment_selector(env_values, environment)
+
+    if selector_name == environment.deployment_ids:
         return _load_hosted_deployment_pool_settings(
             env_values,
             environment,
@@ -117,7 +142,13 @@ def load_settings(
             model_version=model_version,
         )
 
-    selector_name = _resolve_single_deployment_selector(env_values, environment)
+    if selector_name == environment.local_base_urls:
+        return _load_local_service_pool_settings(
+            env_values,
+            environment,
+            schema_version=schema_version,
+            model_version=model_version,
+        )
 
     if selector_name == environment.local_base_url:
         local_base_url = normalize_local_service_base_url(
@@ -436,24 +467,7 @@ def build_local_predict_url(service_base_url: str) -> str:
 def normalize_local_service_base_url(value: str) -> str:
     """Validate and normalize a direct local JointFM service base URL."""
 
-    normalized_url = _normalize_non_whitespace_string(
-        value,
-        JOINTFM_LOCAL_BASE_URL_ENV,
-    ).rstrip("/")
-    parsed_url = urlparse(normalized_url)
-    if parsed_url.scheme not in {"http", "https"}:
-        raise JointFMConfigurationError(
-            f"{JOINTFM_LOCAL_BASE_URL_ENV} must be an http or https URL"
-        )
-    if not parsed_url.netloc:
-        raise JointFMConfigurationError(
-            f"{JOINTFM_LOCAL_BASE_URL_ENV} must include a hostname"
-        )
-    if parsed_url.params or parsed_url.query or parsed_url.fragment:
-        raise JointFMConfigurationError(
-            f"{JOINTFM_LOCAL_BASE_URL_ENV} must not include params, query, or fragment"
-        )
-    return normalized_url
+    return _normalize_local_service_base_url(value, JOINTFM_LOCAL_BASE_URL_ENV)
 
 
 def build_datarobot_prediction_headers(api_token: str) -> dict[str, str]:
@@ -497,7 +511,7 @@ def _required_env(env: Mapping[str, str], name: str) -> str:
     return value
 
 
-def _resolve_single_deployment_selector(
+def _resolve_deployment_selector(
     env: Mapping[str, str],
     environment: EnvironmentVariableConfig,
 ) -> str:
@@ -507,12 +521,15 @@ def _resolve_single_deployment_selector(
         for selector_name in deployment_selector_envs
         if selector_name in env and env[selector_name] != ""
     ]
-    if len(selector_names) != 1:
-        formatted_selectors = ", ".join(
-            (*deployment_selector_envs, environment.deployment_ids)
-        )
+    if not selector_names:
         raise JointFMConfigurationError(
-            f"Exactly one deployment selector is required: {formatted_selectors}"
+            "Exactly one deployment selector is required: "
+            f"{', '.join(deployment_selector_envs)}"
+        )
+    if len(selector_names) > 1:
+        raise JointFMConfigurationError(
+            "Exactly one deployment selector is required; "
+            f"{selector_names[0]} cannot be combined with {', '.join(selector_names[1:])}"
         )
     return selector_names[0]
 
@@ -535,7 +552,7 @@ def _load_hosted_deployment_pool_settings(
     )
     instances = tuple(
         JointFMInstanceSettings(
-            deployment_id=deployment_id,
+            instance_id=deployment_id,
             predict_url=build_hosted_predict_url(datarobot_endpoint, deployment_id),
         )
         for deployment_id in deployment_ids
@@ -550,12 +567,71 @@ def _load_hosted_deployment_pool_settings(
         schema_version=schema_version,
         instances=instances,
         model_version=model_version,
-        deployment_id=primary.deployment_id,
+        deployment_id=primary.instance_id,
         deployment_url=build_hosted_deployment_url(
             datarobot_endpoint,
-            primary.deployment_id,
+            primary.instance_id,
         ),
     )
+
+
+def _load_local_service_pool_settings(
+    env: Mapping[str, str],
+    environment: EnvironmentVariableConfig,
+    *,
+    schema_version: str,
+    model_version: str | None,
+) -> JointFMSettings:
+    """Build pool settings for several local services; the first one is primary.
+
+    Every instance is named by its normalized base URL and reached without
+    DataRobot credentials, exactly like a single ``JOINTFM_LOCAL_BASE_URL``.
+    """
+    base_urls = _parse_local_base_urls(_required_env(env, environment.local_base_urls))
+    instances = tuple(
+        JointFMInstanceSettings(
+            instance_id=base_url,
+            predict_url=build_local_predict_url(base_url),
+        )
+        for base_url in base_urls
+    )
+    primary = instances[0]
+    return JointFMSettings(
+        datarobot_endpoint=None,
+        datarobot_api_token=None,
+        health_url=build_local_health_url(primary.instance_id),
+        predict_url=primary.predict_url,
+        deployment_selector="local_services",
+        schema_version=schema_version,
+        instances=instances,
+        model_version=model_version,
+        local_base_url=primary.instance_id,
+    )
+
+
+def _parse_local_base_urls(value: str) -> tuple[str, ...]:
+    """Return the unique normalized base URLs of a ``JOINTFM_LOCAL_BASE_URLS`` list.
+
+    URLs that normalize to the same base (for example with and without a
+    trailing slash) count once, so at least two distinct services remain.
+    """
+    if "," not in value:
+        raise JointFMConfigurationError(
+            f"{JOINTFM_LOCAL_BASE_URLS_ENV} must be a comma-separated list of "
+            "at least two unique local service base URLs"
+        )
+    base_urls = tuple(
+        dict.fromkeys(
+            _normalize_local_service_base_url(part, JOINTFM_LOCAL_BASE_URLS_ENV)
+            for part in value.split(",")
+        )
+    )
+    if len(base_urls) < 2:
+        raise JointFMConfigurationError(
+            f"{JOINTFM_LOCAL_BASE_URLS_ENV} must contain at least two unique "
+            "local service base URLs"
+        )
+    return base_urls
 
 
 def _parse_deployment_ids(value: str) -> tuple[str, ...]:
@@ -581,21 +657,6 @@ def _parse_deployment_ids(value: str) -> tuple[str, ...]:
             f"{JOINTFM_DEPLOYMENT_IDS_ENV} must contain at least two unique deployment IDs"
         )
     return tuple(deployment_ids)
-
-
-def _reject_conflicting_selectors_with_deployment_ids(
-    env: Mapping[str, str],
-    environment: EnvironmentVariableConfig,
-) -> None:
-    conflicting = [
-        name
-        for name in environment.deployment_selector_names()
-        if name in env and env[name] != ""
-    ]
-    if conflicting:
-        raise JointFMConfigurationError(
-            f"{JOINTFM_DEPLOYMENT_IDS_ENV} cannot be combined with {', '.join(conflicting)}"
-        )
 
 
 def _load_pulumi_target_outputs(
@@ -655,6 +716,20 @@ def _normalize_absolute_https_url(value: str, env_name: str) -> str:
     parsed_url = urlparse(normalized_url)
     if parsed_url.scheme != "https":
         raise JointFMConfigurationError(f"{env_name} must be an https URL")
+    if not parsed_url.netloc:
+        raise JointFMConfigurationError(f"{env_name} must include a hostname")
+    if parsed_url.params or parsed_url.query or parsed_url.fragment:
+        raise JointFMConfigurationError(
+            f"{env_name} must not include params, query, or fragment"
+        )
+    return normalized_url
+
+
+def _normalize_local_service_base_url(value: str, env_name: str) -> str:
+    normalized_url = _normalize_non_whitespace_string(value, env_name).rstrip("/")
+    parsed_url = urlparse(normalized_url)
+    if parsed_url.scheme not in {"http", "https"}:
+        raise JointFMConfigurationError(f"{env_name} must be an http or https URL")
     if not parsed_url.netloc:
         raise JointFMConfigurationError(f"{env_name} must include a hostname")
     if parsed_url.params or parsed_url.query or parsed_url.fragment:

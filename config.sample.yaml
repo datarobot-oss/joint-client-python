@@ -11,6 +11,7 @@ environment:
   predict_url: JOINTFM_PREDICT_URL
   deployment_target: JOINTFM_DEPLOYMENT_TARGET
   local_base_url: JOINTFM_LOCAL_BASE_URL
+  local_base_urls: JOINTFM_LOCAL_BASE_URLS
   pulumi_outputs_path: JOINTFM_PULUMI_OUTPUTS_PATH
   schema_version: JOINTFM_SCHEMA_VERSION
   model_version: JOINTFM_MODEL_VERSION
@@ -23,6 +24,7 @@ deployment:
   predict_url: null
   deployment_target: null
   local_base_url: null
+  local_base_urls: null
   pulumi_outputs_path: null
   schema_version: null
   model_version: null

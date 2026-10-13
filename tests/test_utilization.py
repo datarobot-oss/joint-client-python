@@ -72,7 +72,7 @@ def _settings(*deployment_ids: str) -> JointFMSettings:
         schema_version="v5",
         instances=tuple(
             JointFMInstanceSettings(
-                deployment_id=deployment_id, predict_url=_url(deployment_id)
+                instance_id=deployment_id, predict_url=_url(deployment_id)
             )
             for deployment_id in deployment_ids
         )
@@ -98,6 +98,7 @@ def _health_payload(
         "checkpoint_version": "sdk-test",
         "checkpoint_path": "/models/jointfm.pt",
         "device": "cpu",
+        "generation": "jointfm-1",
         "head": "studentt",
         "decoding_strategy": "parallel_dense",
         "supported_query_modes": ["forecast"],
@@ -108,7 +109,7 @@ def _health_payload(
             "continuous_float",
             "absolute_datetime",
         ],
-        "time_index_encoding": "legacy_discrete_grid",
+        "time_index_encoding": "discrete_grid",
         "max_sample_count": max_sample_count,
         "max_concurrent_requests": max_concurrent_requests,
     }

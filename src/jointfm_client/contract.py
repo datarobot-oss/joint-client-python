@@ -819,9 +819,11 @@ class DataGenerationCapabilities:
 class HealthMetadata:
     """Typed representation of `/healthz` service metadata.
 
-    ``max_sample_count`` caps the samples one request may ask for, and
-    ``max_concurrent_requests`` is how many requests the container serves at
-    once; a further request waits for a free slot.
+    ``generation`` names the JointFM generation of the mounted checkpoint
+    (``jointfm-1`` or ``jointfm-2``). ``max_sample_count`` caps the samples
+    one request may ask for, and ``max_concurrent_requests`` is how many
+    requests the container serves at once; a further request waits for a
+    free slot.
     """
 
     status: str
@@ -831,6 +833,7 @@ class HealthMetadata:
     checkpoint_version: str
     checkpoint_path: str
     device: str
+    generation: str
     head: str
     decoding_strategy: DecodingStrategy
     supported_query_modes: tuple[str, ...]
@@ -882,6 +885,10 @@ class HealthMetadata:
                 field="checkpoint_path",
             ),
             device=_require_string(payload.get("device"), field="device"),
+            generation=_require_string(
+                payload.get("generation"),
+                field="generation",
+            ),
             head=_require_string(payload.get("head"), field="head"),
             decoding_strategy=_require_decoding_strategy(
                 payload.get("decoding_strategy")

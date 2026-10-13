@@ -174,7 +174,7 @@ def _health_command(args: argparse.Namespace, stdout: TextIO) -> int:
         "service": asdict(health),
         "instances": [
             {
-                "deployment_id": entry.deployment_id,
+                "instance_id": entry.instance_id,
                 "available": entry.metadata is not None,
                 "max_sample_count": (
                     None if entry.metadata is None else entry.metadata.max_sample_count

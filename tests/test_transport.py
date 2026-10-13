@@ -41,6 +41,8 @@ from jointfm_client import (
     JointFMRequestError,
     JointFMHTTPStatusError,
     JointFMHTTPTransport,
+    JOINTFM_LOCAL_BASE_URLS_ENV,
+    JOINTFM_SCHEMA_VERSION_ENV,
     JointFMInstanceSettings,
     JointFMResponseDecodeError,
     JointFMServiceError,
@@ -51,6 +53,7 @@ from jointfm_client import (
     SampleForecastResult,
     UnsupportedModelVersionError,
     UnsupportedServiceContractError,
+    load_settings,
 )
 from jointfm_client.contract import PACKAGE_VERSION
 
@@ -161,6 +164,7 @@ def _health_payload(
         "checkpoint_version": checkpoint_version,
         "checkpoint_path": "/models/jointfm.pt",
         "device": "cpu",
+        "generation": "jointfm-1",
         "head": "studentt",
         "decoding_strategy": "parallel_dense",
         "supported_query_modes": ["forecast"],
@@ -171,7 +175,7 @@ def _health_payload(
             "continuous_float",
             "absolute_datetime",
         ],
-        "time_index_encoding": "legacy_discrete_grid",
+        "time_index_encoding": "discrete_grid",
         "max_sample_count": 4096,
         "max_concurrent_requests": 1,
     }
@@ -687,7 +691,7 @@ def test_client_health_instances_returns_one_entry_for_single_endpoint() -> None
     instances = client.health_instances()
 
     assert len(instances.instances) == 1
-    assert instances.instances[0].deployment_id == "deployment-id"
+    assert instances.instances[0].instance_id == "deployment-id"
     assert instances.instances[0].metadata is not None
     assert (
         instances.max_sample_count == instances.instances[0].metadata.max_sample_count
@@ -1284,8 +1288,8 @@ def _pool_settings(primary: str, backup: str) -> JointFMSettings:
         deployment_selector="deployment_ids",
         schema_version="v5",
         instances=(
-            JointFMInstanceSettings(deployment_id="primary-id", predict_url=primary),
-            JointFMInstanceSettings(deployment_id="backup-id", predict_url=backup),
+            JointFMInstanceSettings(instance_id="primary-id", predict_url=primary),
+            JointFMInstanceSettings(instance_id="backup-id", predict_url=backup),
         ),
         model_version="jointfm-inference:0.3.0+ckpt.sdk-test",
         deployment_id="primary-id",
@@ -1481,3 +1485,167 @@ def test_client_pool_splits_sample_requests_below_cap_across_all_peers(
     assert sorted(seed for _, _, seed in predicts) == expected_seeds
     assert len({url for url, _, _ in predicts}) == len(expected_sizes)
     assert result.diagnostics.seed == 7
+
+
+_LOCAL_PRIMARY = "http://127.0.0.1:8080"
+_LOCAL_BACKUP = "http://127.0.0.1:8081"
+
+
+def _local_pool_settings() -> JointFMSettings:
+    """Local pool settings resolved through the JOINTFM_LOCAL_BASE_URLS selector."""
+    return load_settings(
+        env={
+            JOINTFM_LOCAL_BASE_URLS_ENV: f"{_LOCAL_PRIMARY},{_LOCAL_BACKUP}",
+            JOINTFM_SCHEMA_VERSION_ENV: "v5",
+        },
+        dotenv_path=None,
+    )
+
+
+class _LocalPoolTransport:
+    """Fake transport for local services: health on POST /predict, samples echo seeds."""
+
+    def __init__(
+        self,
+        *,
+        down: frozenset[str] = frozenset(),
+        checkpoint_by_url: Mapping[str, str] | None = None,
+    ) -> None:
+        """Init."""
+        self.down = down
+        self.checkpoint_by_url = checkpoint_by_url or {}
+        self.requests: list[tuple[str, str, Mapping[str, Any] | None]] = []
+
+    def get_json(self, url: str) -> Mapping[str, Any]:
+        """Get json."""
+        self.requests.append(("GET", url, None))
+        return _health_payload()
+
+    def post_json(self, url: str, payload: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Post json."""
+        self.requests.append(("POST", url, payload))
+        if url in self.down:
+            raise JointFMRequestError(f"connection refused: {url}")
+        if payload.get("request_type") == "health":
+            health = _health_payload(
+                checkpoint_version=self.checkpoint_by_url.get(url, "sdk-test")
+            )
+            health["max_sample_count"] = 2
+            return health
+        if payload.get("return_mode") != "samples":
+            return _forecast_response_payload()
+        sample_count = cast(int, payload["n_samples"])
+        seed = cast(int, payload["seed"])
+        response_payload = _forecast_response_payload(return_mode="samples")
+        outputs = cast(dict[str, object], response_payload["outputs"])
+        outputs["samples"] = [[[float(seed)]] for _ in range(sample_count)]
+        diagnostics = cast(dict[str, object], response_payload["diagnostics"])
+        diagnostics["seed"] = seed
+        return response_payload
+
+
+def _forecast_local_pool_samples(client: JointFMClient) -> SampleForecastResult:
+    """Request four seeded samples of one target column."""
+    schema = DataFrameSchema(
+        columns=(ColumnSpec(name="target", modality="numeric", role="target"),),
+        time_index_mode="ordinal",
+    )
+    return client.forecast_samples(
+        [{"target": 10.0}, {"target": 11.0}],
+        schema=schema,
+        query_times=[2],
+        requested_columns=["target"],
+        model_version="jointfm-inference:0.3.0+ckpt.sdk-test",
+        n_samples=4,
+        seed=7,
+    )
+
+
+def test_local_pool_gates_health_and_splits_samples_across_local_services() -> None:
+    """A local pool probes every service and spreads sample batches over them."""
+    transport = _LocalPoolTransport()
+    client = JointFMClient(settings=_local_pool_settings(), transport=transport)
+
+    instances = client.health_instances(cache=True)
+    result = _forecast_local_pool_samples(client)
+
+    assert [entry.instance_id for entry in instances.instances] == [
+        _LOCAL_PRIMARY,
+        _LOCAL_BACKUP,
+    ]
+    assert instances.topology_label == "2x2"
+    assert all(method == "POST" for method, _, _ in transport.requests)
+    predict_urls = [
+        url
+        for _, url, payload in transport.requests
+        if payload is not None and payload.get("request_type") != "health"
+    ]
+    assert sorted(predict_urls) == [
+        f"{_LOCAL_PRIMARY}/predict",
+        f"{_LOCAL_BACKUP}/predict",
+    ]
+    np.testing.assert_array_equal(
+        result.samples, (((7.0,),), ((7.0,),), ((8.0,),), ((8.0,),))
+    )
+
+
+def test_local_pool_fails_over_when_a_local_service_is_unreachable() -> None:
+    """An unreachable local service is skipped by the health gate and by routing."""
+    transport = _LocalPoolTransport(down=frozenset({f"{_LOCAL_PRIMARY}/predict"}))
+    client = JointFMClient(settings=_local_pool_settings(), transport=transport)
+
+    instances = client.health_instances(cache=True)
+    result = _forecast_local_pool_samples(client)
+
+    assert instances.instances[0].metadata is None
+    assert instances.instances[1].metadata is not None
+    assert len(result.samples) == 4
+    predict_urls = {
+        url
+        for _, url, payload in transport.requests
+        if payload is not None and payload.get("request_type") != "health"
+    }
+    assert predict_urls == {f"{_LOCAL_BACKUP}/predict"}
+
+
+def test_local_pool_rejects_local_services_on_different_checkpoints() -> None:
+    """Local peers must serve the same checkpoint, as hosted peers must."""
+    transport = _LocalPoolTransport(
+        checkpoint_by_url={f"{_LOCAL_BACKUP}/predict": "other-checkpoint"}
+    )
+    client = JointFMClient(settings=_local_pool_settings(), transport=transport)
+
+    with pytest.raises(UnsupportedServiceContractError, match=_LOCAL_BACKUP):
+        client.health()
+
+
+def test_local_pool_endpoint_client_targets_one_local_service() -> None:
+    """A local pool instance's own client probes that service on GET /healthz."""
+    transport = _LocalPoolTransport()
+    client = JointFMClient(settings=_local_pool_settings(), transport=transport)
+
+    endpoint = client.endpoint_client(_LOCAL_BACKUP)
+    endpoint.health()
+
+    assert endpoint.settings is not None
+    assert endpoint.settings.deployment_selector == "local_service"
+    assert endpoint.settings.instances == ()
+    assert endpoint.settings.instance_id == _LOCAL_BACKUP
+    assert endpoint.predict_url == f"{_LOCAL_BACKUP}/predict"
+    assert transport.requests == [("GET", f"{_LOCAL_BACKUP}/healthz", None)]
+    with pytest.raises(JointFMConfigurationError, match="http://127.0.0.1:9999"):
+        client.endpoint_client("http://127.0.0.1:9999")
+
+
+def test_transport_from_local_pool_settings_omits_hosted_auth_headers() -> None:
+    """Local pool peers are reached without DataRobot credentials."""
+    session = requests.Session()
+    transport = JointFMHTTPTransport.from_settings(
+        session=session, settings=_local_pool_settings()
+    )
+    adapter = StaticResponseAdapter(_response(body=b'{"ok": true}'))
+    session.mount("http://", adapter)
+
+    transport.post_json(f"{_LOCAL_BACKUP}/predict", {"request_type": "health"})
+
+    assert "Authorization" not in dict(adapter.requests[0].headers or {})

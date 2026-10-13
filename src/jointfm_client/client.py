@@ -76,6 +76,7 @@ from jointfm_client.pool import HealthInstances, InstanceHealth, JointFMInstance
 from jointfm_client.settings import (
     JointFMSettings,
     build_hosted_deployment_url,
+    build_local_health_url,
     load_settings,
     validate_jointfm_model_version,
 )
@@ -183,28 +184,30 @@ class JointFMClient:
     def health(self, *, cache: bool = False, refresh: bool = False) -> HealthMetadata:
         """Return service metadata from the configured JointFM endpoint.
 
-        Local deployments (``deployment_selector == "local_service"``) probe the
+        A single local service (``JOINTFM_LOCAL_BASE_URL``) is probed on the
         container's ``GET /healthz`` route directly. Hosted DataRobot deployments
         POST ``{"request_type": "health"}`` to ``predict_url`` because DataRobot's
         deployment gateway only proxies the unstructured prediction route; the
         container short-circuits that body before any schema or model version
         validation and returns the same typed health payload.
 
-        When ``JOINTFM_DEPLOYMENT_IDS`` is set, reachable peers are probed and must
-        share ``model_version`` and ``checkpoint_version``; the sample-batch cap is
+        When a pool is configured (``JOINTFM_DEPLOYMENT_IDS`` or
+        ``JOINTFM_LOCAL_BASE_URLS``), every peer is probed through that
+        predict-route health request, and reachable peers must share
+        ``model_version`` and ``checkpoint_version``; the sample-batch cap is
         the minimum ``max_sample_count`` across those peers, and the advertised
         ``max_concurrent_requests`` is likewise the minimum. Use
-        ``health_instances()`` for the per-deployment results of this probe.
+        ``health_instances()`` for the per-instance results of this probe.
         """
         return self._probe_health(cache=cache, refresh=refresh).metadata
 
     def health_instances(
         self, *, cache: bool = False, refresh: bool = False
     ) -> HealthInstances:
-        """Return per-deployment health from the same probe as ``health()``.
+        """Return per-instance health from the same probe as ``health()``.
 
-        A single-endpoint client yields one entry. A deployment-ID pool yields
-        one entry per configured ID, including peers skipped as unreachable or
+        A single-endpoint client yields one entry. A pool yields one entry per
+        configured instance, including peers skipped as unreachable or
         incompatible. ``max_sample_count`` is the sum of each reachable instance's
         ``max_sample_count``, one request per instance; each instance's own
         ``max_concurrent_requests`` says how many such requests it serves at
@@ -217,26 +220,27 @@ class JointFMClient:
             self._probe_health(cache=cache, refresh=refresh).instances
         )
 
-    def endpoint_client(self, deployment_id: str | None) -> JointFMClient:
-        """Return a new single-endpoint client for one configured deployment.
+    def endpoint_client(self, instance_id: str | None) -> JointFMClient:
+        """Return a new single-endpoint client for one configured instance.
 
-        ``deployment_id`` names one instance of a ``JOINTFM_DEPLOYMENT_IDS``
-        pool; for a single-endpoint client it must equal this client's own
-        ``settings.deployment_id``, which is ``None`` for a local service. The
-        new client keeps this client's timeout and retry policy but owns its
-        own HTTP session and health cache, so several of them can send
-        requests to the same deployment at once. A transport injected into
-        this client is shared instead, as the pool shares it across peers.
-        Raises ``JointFMConfigurationError`` without settings or for a
-        deployment ID this client does not configure.
+        ``instance_id`` is an ``InstanceHealth.instance_id``: one pool
+        instance's deployment ID (``JOINTFM_DEPLOYMENT_IDS``) or local base
+        URL (``JOINTFM_LOCAL_BASE_URLS``), or, for a single-endpoint client,
+        this client's own ``settings.instance_id``. The new client keeps this
+        client's timeout and retry policy but owns its own HTTP session and
+        health cache, so several of them can send requests to the same
+        instance at once. A transport injected into this client is shared
+        instead, as the pool shares it across peers. Raises
+        ``JointFMConfigurationError`` without settings or for an instance this
+        client does not configure.
         """
         settings = self._require_settings("endpoint_client")
         if self._uses_pool():
-            settings = _pool_instance_settings(settings, deployment_id)
-        elif deployment_id != settings.deployment_id:
+            settings = _pool_instance_settings(settings, instance_id)
+        elif instance_id != settings.instance_id:
             raise JointFMConfigurationError(
-                f"deployment_id {deployment_id!r} is not configured; this client "
-                f"targets {settings.deployment_id!r}"
+                f"instance_id {instance_id!r} is not configured; this client "
+                f"targets {settings.instance_id!r}"
             )
         return JointFMClient(
             settings=settings,
@@ -270,7 +274,7 @@ class JointFMClient:
         return None if probed is None else probed.metadata
 
     def _probe_pool_health(self) -> _ProbedHealth:
-        """Probe a ``JOINTFM_DEPLOYMENT_IDS`` pool via the shared pool client."""
+        """Probe a configured pool via the shared pool client."""
         result = self._require_pool().probe_health()
         return _ProbedHealth(result.metadata, result.instances)
 
@@ -283,20 +287,22 @@ class JointFMClient:
 
         validate_service_metadata(
             payload,
-            expected_model_version=getattr(self.settings, "model_version", None),
+            expected_model_version=(
+                None if self.settings is None else self.settings.model_version
+            ),
         )
         metadata = HealthMetadata.from_payload(payload)
-        deployment_id = getattr(self.settings, "deployment_id", None)
+        instance_id = None if self.settings is None else self.settings.instance_id
         return _ProbedHealth(
             metadata,
-            (InstanceHealth(deployment_id=deployment_id, metadata=metadata),),
+            (InstanceHealth(instance_id=instance_id, metadata=metadata),),
         )
 
     def _uses_predict_route_for_health(self) -> bool:
         """Return whether hosted health probes must POST to the predict route."""
         if self.settings is None:
             return False
-        return self.settings.deployment_selector != "local_service"
+        return not self.settings.is_local
 
     def _health_route_configured(self) -> bool:
         """Return whether a health probe can be issued with the current settings."""
@@ -936,7 +942,7 @@ class JointFMClient:
     def _require_pool(self) -> JointFMInstancePool:
         if not self._uses_pool():
             raise JointFMConfigurationError(
-                "JointFMClient pool routing requires multiple deployment instances"
+                "JointFMClient pool routing requires multiple instances"
             )
         if self._pool is None:
             assert self.settings is not None
@@ -1137,21 +1143,35 @@ def _is_history_row_sequence(value: Any) -> bool:
 
 
 def _pool_instance_settings(
-    settings: JointFMSettings, deployment_id: str | None
+    settings: JointFMSettings, instance_id: str | None
 ) -> JointFMSettings:
-    """Return single-deployment settings for one instance of a pool."""
+    """Return the settings one instance of a pool would have on its own.
+
+    A local pool instance becomes a ``JOINTFM_LOCAL_BASE_URL`` target probed
+    on ``GET /healthz``; a hosted one becomes a ``JOINTFM_DEPLOYMENT_ID``
+    target.
+    """
     instance = next(
         (
             instance
             for instance in settings.instances
-            if instance.deployment_id == deployment_id
+            if instance.instance_id == instance_id
         ),
         None,
     )
     if instance is None:
         raise JointFMConfigurationError(
-            f"deployment_id {deployment_id!r} is not one of the configured pool "
-            f"instances {[entry.deployment_id for entry in settings.instances]}"
+            f"instance_id {instance_id!r} is not one of the configured pool "
+            f"instances {[entry.instance_id for entry in settings.instances]}"
+        )
+    if settings.is_local:
+        return replace(
+            settings,
+            health_url=build_local_health_url(instance.instance_id),
+            predict_url=instance.predict_url,
+            deployment_selector="local_service",
+            instances=(),
+            local_base_url=instance.instance_id,
         )
     assert settings.datarobot_endpoint is not None
     return replace(
@@ -1160,9 +1180,9 @@ def _pool_instance_settings(
         predict_url=instance.predict_url,
         deployment_selector="deployment_id",
         instances=(),
-        deployment_id=instance.deployment_id,
+        deployment_id=instance.instance_id,
         deployment_url=build_hosted_deployment_url(
-            settings.datarobot_endpoint, instance.deployment_id
+            settings.datarobot_endpoint, instance.instance_id
         ),
     )
 

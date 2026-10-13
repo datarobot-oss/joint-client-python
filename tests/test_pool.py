@@ -42,7 +42,7 @@ _OVERLAP_PROBE_SECONDS = 0.02
 def _instance(deployment_id: str) -> JointFMInstanceSettings:
     """Instance."""
     return JointFMInstanceSettings(
-        deployment_id=deployment_id,
+        instance_id=deployment_id,
         predict_url=(
             "https://app.datarobot.com/api/v2/deployments/"
             f"{deployment_id}/predictionsUnstructured"
@@ -65,6 +65,7 @@ def _health(
         "checkpoint_version": checkpoint_version,
         "checkpoint_path": "/models/jointfm.pt",
         "device": "cpu",
+        "generation": "jointfm-1",
         "head": "studentt",
         "decoding_strategy": "parallel_dense",
         "supported_query_modes": ["forecast"],
@@ -75,7 +76,7 @@ def _health(
             "continuous_float",
             "absolute_datetime",
         ],
-        "time_index_encoding": "legacy_discrete_grid",
+        "time_index_encoding": "discrete_grid",
         "max_sample_count": max_sample_count,
         "max_concurrent_requests": 1,
     }
@@ -136,8 +137,8 @@ def _pool(
 def test_pool_retries_next_instance_on_470() -> None:
     """Pool retries next instance on 470."""
     pool = _pool(transport=_Transport(fail_ids=frozenset({"a"})))
-    assert pool.next_instance().deployment_id == "a"
-    assert pool.next_instance().deployment_id == "b"
+    assert pool.next_instance().instance_id == "a"
+    assert pool.next_instance().instance_id == "b"
     assert pool.post_json({"schema_version": "v5"}) == {
         "ok": True,
         "deployment_id": "b",
@@ -163,7 +164,7 @@ def test_pool_health_rejects_mismatch_and_aligns_sample_cap() -> None:
     )
     with pytest.raises(UnsupportedModelVersionError, match="model_version"):
         mismatched.probe_all_health()
-    assert {mismatched.instance_at(i).deployment_id for i in range(2)} == {"a", "b"}
+    assert {mismatched.instance_at(i).instance_id for i in range(2)} == {"a", "b"}
 
     with pytest.raises(UnsupportedServiceContractError, match="checkpoint_version"):
         _pool(
@@ -229,7 +230,7 @@ def test_health_instances_excludes_unavailable_peer_from_sum_and_topology() -> N
     ).probe_health()
     instances = HealthInstances.from_instances(result.instances)
 
-    assert [entry.deployment_id for entry in instances.instances] == ["a", "b"]
+    assert [entry.instance_id for entry in instances.instances] == ["a", "b"]
     assert instances.instances[0].metadata is None
     assert instances.instances[0].error is not None
     assert instances.instances[1].metadata is not None
@@ -246,7 +247,7 @@ def _typed_health(*, max_sample_count: int = 4096) -> HealthMetadata:
 def test_health_instances_from_single_entry() -> None:
     """A single reachable entry yields one instance and a 1x topology."""
     entry = InstanceHealth(
-        deployment_id="deployment-id",
+        instance_id="deployment-id",
         metadata=_typed_health(max_sample_count=4096),
     )
     instances = HealthInstances.from_instances((entry,))
@@ -340,9 +341,9 @@ def test_pool_health_routes_only_reachable_peers() -> None:
         )
     )
     pool.probe_all_health()
-    assert pool.instance_at(0).deployment_id == "b"
-    assert pool.instance_at(1).deployment_id == "b"
-    assert pool.next_instance().deployment_id == "b"
+    assert pool.instance_at(0).instance_id == "b"
+    assert pool.instance_at(1).instance_id == "b"
+    assert pool.next_instance().instance_id == "b"
     assert pool.post_json({"schema_version": "v5"})["deployment_id"] == "b"
 
 
@@ -354,11 +355,11 @@ def test_pool_failover_retries_health_excluded_peer() -> None:
     )
     pool = _pool(transport=transport)
     pool.probe_all_health()
-    assert pool.instance_at(0).deployment_id == "b"
+    assert pool.instance_at(0).instance_id == "b"
 
     transport.fail_ids = frozenset({"b"})
     assert pool.post_json({"schema_version": "v5"})["deployment_id"] == "a"
-    assert pool.instance_at(0).deployment_id == "a"
+    assert pool.instance_at(0).instance_id == "a"
 
 
 def test_pool_health_skips_incompatible_peer_when_another_matches_pin() -> None:
@@ -375,8 +376,8 @@ def test_pool_health_skips_incompatible_peer_when_another_matches_pin() -> None:
     )
     metadata = pool.probe_all_health()
     assert metadata.model_version == pinned
-    assert pool.instance_at(0).deployment_id == "a"
-    assert pool.instance_at(1).deployment_id == "a"
+    assert pool.instance_at(0).instance_id == "a"
+    assert pool.instance_at(1).instance_id == "a"
     assert pool.post_json({"schema_version": "v5"})["deployment_id"] == "a"
 
 
@@ -390,13 +391,13 @@ def test_pool_cooldown_restores_peer_after_transient_failure(
     pool = _pool(transport=transport, peer_cooldown_seconds=10.0)
 
     assert pool.post_json({"schema_version": "v5"})["deployment_id"] == "b"
-    assert pool.instance_at(0).deployment_id == "b"
-    assert pool.instance_at(1).deployment_id == "b"
+    assert pool.instance_at(0).instance_id == "b"
+    assert pool.instance_at(1).instance_id == "b"
 
     transport.fail_ids = frozenset()
     clock["now"] = 109.0
-    assert pool.instance_at(0).deployment_id == "b"
+    assert pool.instance_at(0).instance_id == "b"
 
     clock["now"] = 110.0
-    assert {pool.instance_at(i).deployment_id for i in range(2)} == {"a", "b"}
+    assert {pool.instance_at(i).instance_id for i in range(2)} == {"a", "b"}
     assert pool.post_json({"schema_version": "v5"})["deployment_id"] in {"a", "b"}

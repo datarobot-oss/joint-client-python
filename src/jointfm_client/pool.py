@@ -12,7 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Round-robin load balancing across multiple hosted JointFM deployments."""
+"""Round-robin load balancing across several JointFM instances.
+
+An instance is a hosted DataRobot deployment or a local service; the pool
+treats both alike because each answers the health request on its predict route.
+"""
 
 from __future__ import annotations
 
@@ -46,7 +50,7 @@ _DEFAULT_PEER_COOLDOWN_SECONDS = 30.0
 
 
 class PoolPeer:
-    """One hosted deployment endpoint with a Session-safe POST lock."""
+    """One JointFM instance endpoint with a Session-safe POST lock."""
 
     def __init__(
         self,
@@ -59,9 +63,9 @@ class PoolPeer:
         self._post_lock = post_lock
 
     @property
-    def deployment_id(self) -> str:
-        """Deployment identifier used for routing and health accounting."""
-        return self.settings.deployment_id
+    def instance_id(self) -> str:
+        """Instance identifier used for routing and health accounting."""
+        return self.settings.instance_id
 
     def post_json(self, payload: Mapping[str, Any]) -> Mapping[str, Any]:
         """POST ``payload`` to this peer's predict URL under the peer lock."""
@@ -71,16 +75,16 @@ class PoolPeer:
 
 @dataclass(frozen=True, slots=True)
 class InstanceHealth:
-    """Health probe outcome for one configured JointFM deployment."""
+    """Health probe outcome for one configured JointFM instance."""
 
-    deployment_id: str | None
+    instance_id: str | None
     metadata: HealthMetadata | None = None
     error: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class HealthInstances:
-    """Per-deployment health results and the summed sample budget.
+    """Per-instance health results and the summed sample budget.
 
     ``max_sample_count`` is the sum of reachable peers' caps, one request per
     peer; a peer advertising ``max_concurrent_requests`` above one serves that
@@ -96,7 +100,7 @@ class HealthInstances:
 
     @classmethod
     def from_instances(cls, instances: tuple[InstanceHealth, ...]) -> Self:
-        """Build the response from per-deployment probe outcomes."""
+        """Build the response from per-instance probe outcomes."""
         caps = tuple(
             instance.metadata.max_sample_count
             for instance in instances
@@ -114,7 +118,7 @@ class HealthInstances:
 
 @dataclass(frozen=True, slots=True)
 class HealthProbeResult:
-    """Merged health metadata, healthy peer IDs, and per-deployment outcomes."""
+    """Merged health metadata, healthy peer IDs, and per-instance outcomes."""
 
     metadata: HealthMetadata
     healthy_ids: frozenset[str]
@@ -127,13 +131,13 @@ class PeerRoutingState:
     def __init__(
         self,
         *,
-        deployment_ids: Sequence[str],
+        instance_ids: Sequence[str],
         peer_cooldown_seconds: float,
     ) -> None:
         self._peer_cooldown_seconds = peer_cooldown_seconds
         self._lock = threading.Lock()
         self._index = 0
-        self._active_ids = set(deployment_ids)
+        self._active_ids = set(instance_ids)
         self._cooldown_until: dict[str, float] = {}
 
     def eligible(self, peers: Sequence[PoolPeer]) -> tuple[PoolPeer, ...]:
@@ -159,29 +163,29 @@ class PeerRoutingState:
         with self._lock:
             self._active_ids = set(healthy_ids)
             self._index = 0
-            for deployment_id in healthy_ids:
-                self._cooldown_until.pop(deployment_id, None)
+            for instance_id in healthy_ids:
+                self._cooldown_until.pop(instance_id, None)
 
-    def cool_down(self, deployment_id: str) -> None:
-        """Temporarily exclude ``deployment_id`` from preferred routing."""
+    def cool_down(self, instance_id: str) -> None:
+        """Temporarily exclude ``instance_id`` from preferred routing."""
         with self._lock:
-            self._cooldown_until[deployment_id] = (
+            self._cooldown_until[instance_id] = (
                 time.monotonic() + self._peer_cooldown_seconds
             )
 
-    def reactivate(self, deployment_id: str) -> None:
-        """Mark ``deployment_id`` active and clear any cooldown."""
+    def reactivate(self, instance_id: str) -> None:
+        """Mark ``instance_id`` active and clear any cooldown."""
         with self._lock:
-            self._active_ids.add(deployment_id)
-            self._cooldown_until.pop(deployment_id, None)
+            self._active_ids.add(instance_id)
+            self._cooldown_until.pop(instance_id, None)
 
     def _eligible_unlocked(self, peers: Sequence[PoolPeer]) -> tuple[PoolPeer, ...]:
         now = time.monotonic()
-        active = tuple(peer for peer in peers if peer.deployment_id in self._active_ids)
+        active = tuple(peer for peer in peers if peer.instance_id in self._active_ids)
         not_cooling = tuple(
             peer
             for peer in active
-            if self._cooldown_until.get(peer.deployment_id, 0.0) <= now
+            if self._cooldown_until.get(peer.instance_id, 0.0) <= now
         )
         # All cooling: still try health-active peers rather than stall.
         return not_cooling or active or tuple(peers)
@@ -208,7 +212,7 @@ class PoolHealthGate:
                 healthy.append((peer, metadata))
                 instances.append(
                     InstanceHealth(
-                        deployment_id=peer.deployment_id,
+                        instance_id=peer.instance_id,
                         metadata=metadata,
                     )
                 )
@@ -216,10 +220,10 @@ class PoolHealthGate:
                 # Skip unreachable or incompatible peers; a bad backup must not
                 # take down a healthy primary.
                 last_error = error
-                _log_unavailable(peer.deployment_id, error)
+                _log_unavailable(peer.instance_id, error)
                 instances.append(
                     InstanceHealth(
-                        deployment_id=peer.deployment_id,
+                        instance_id=peer.instance_id,
                         error=str(error),
                     )
                 )
@@ -230,7 +234,7 @@ class PoolHealthGate:
 
         reference = healthy[0][1]
         for peer, metadata in healthy[1:]:
-            _reject_metadata_mismatch(peer.deployment_id, metadata, reference)
+            _reject_metadata_mismatch(peer.instance_id, metadata, reference)
         metadata = replace(
             reference,
             max_sample_count=min(
@@ -242,13 +246,13 @@ class PoolHealthGate:
         )
         return HealthProbeResult(
             metadata=metadata,
-            healthy_ids=frozenset(peer.deployment_id for peer, _ in healthy),
+            healthy_ids=frozenset(peer.instance_id for peer, _ in healthy),
             instances=tuple(instances),
         )
 
 
 class JointFMInstancePool:
-    """Round-robin JointFM requests across hosted deployments.
+    """Round-robin JointFM requests across hosted deployments or local services.
 
     Use one fail-fast transport per peer (``max_attempts=1``); this pool retries
     peers. Each transport is locked independently so parallel batches stay
@@ -280,9 +284,9 @@ class JointFMInstancePool:
             post_lock = locks_by_transport.setdefault(id(transport), threading.Lock())
             peers.append(PoolPeer(instance, transport, post_lock))
         self._peers = tuple(peers)
-        self._peers_by_id = {peer.deployment_id: peer for peer in self._peers}
+        self._peers_by_id = {peer.instance_id: peer for peer in self._peers}
         self._routing = PeerRoutingState(
-            deployment_ids=tuple(peer.deployment_id for peer in self._peers),
+            instance_ids=tuple(peer.instance_id for peer in self._peers),
             peer_cooldown_seconds=peer_cooldown_seconds,
         )
         self._health_gate = PoolHealthGate(
@@ -325,7 +329,7 @@ class JointFMInstancePool:
         self, instance: JointFMInstanceSettings, payload: Mapping[str, Any]
     ) -> Mapping[str, Any]:
         """POST to ``instance`` first; on retryable failure try remaining peers."""
-        preferred = self._peers_by_id[instance.deployment_id]
+        preferred = self._peers_by_id[instance.instance_id]
         candidates = self._failover_candidates(preferred)
         last_error: BaseException | None = None
         for candidate in candidates:
@@ -335,10 +339,10 @@ class JointFMInstancePool:
                 if not _is_pool_retryable(error):
                     raise
                 last_error = error
-                self._routing.cool_down(candidate.deployment_id)
-                _log_unavailable(candidate.deployment_id, error)
+                self._routing.cool_down(candidate.instance_id)
+                _log_unavailable(candidate.instance_id, error)
                 continue
-            self._routing.reactivate(candidate.deployment_id)
+            self._routing.reactivate(candidate.instance_id)
             return result
         assert last_error is not None
         raise last_error
@@ -346,43 +350,41 @@ class JointFMInstancePool:
     def _failover_candidates(self, preferred: PoolPeer) -> tuple[PoolPeer, ...]:
         """Prefer health-eligible peers; then try health-excluded peers last."""
         eligible = self._routing.eligible(self._peers)
-        if preferred.deployment_id in {peer.deployment_id for peer in eligible}:
+        if preferred.instance_id in {peer.instance_id for peer in eligible}:
             preferred_first = (preferred,) + tuple(
-                peer
-                for peer in eligible
-                if peer.deployment_id != preferred.deployment_id
+                peer for peer in eligible if peer.instance_id != preferred.instance_id
             )
         else:
             preferred_first = eligible
-        seen = {peer.deployment_id for peer in preferred_first}
+        seen = {peer.instance_id for peer in preferred_first}
         last_resort = tuple(
-            peer for peer in self._peers if peer.deployment_id not in seen
+            peer for peer in self._peers if peer.instance_id not in seen
         )
         return preferred_first + last_resort
 
 
 def _reject_metadata_mismatch(
-    deployment_id: str,
+    instance_id: str,
     metadata: HealthMetadata,
     reference: HealthMetadata,
 ) -> None:
     if metadata.model_version != reference.model_version:
         raise UnsupportedModelVersionError(
-            "JointFM deployment pool model_version mismatch: "
-            f"{deployment_id!r} advertises {metadata.model_version!r}, "
+            "JointFM instance pool model_version mismatch: "
+            f"{instance_id!r} advertises {metadata.model_version!r}, "
             f"expected {reference.model_version!r}"
         )
     if metadata.checkpoint_version != reference.checkpoint_version:
         raise UnsupportedServiceContractError(
-            "JointFM deployment pool checkpoint_version mismatch: "
-            f"{deployment_id!r} advertises {metadata.checkpoint_version!r}, "
+            "JointFM instance pool checkpoint_version mismatch: "
+            f"{instance_id!r} advertises {metadata.checkpoint_version!r}, "
             f"expected {reference.checkpoint_version!r}"
         )
 
 
-def _log_unavailable(deployment_id: str, error: BaseException) -> None:
+def _log_unavailable(instance_id: str, error: BaseException) -> None:
     logger.warning(
-        "JointFM instance unavailable: deployment_id=%s error=%s", deployment_id, error
+        "JointFM instance unavailable: instance_id=%s error=%s", instance_id, error
     )
 
 

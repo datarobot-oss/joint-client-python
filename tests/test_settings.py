@@ -26,6 +26,7 @@ from jointfm_client import (
     JOINTFM_DEPLOYMENT_TARGET_ENV,
     JOINTFM_DEPLOYMENT_URL_ENV,
     JOINTFM_LOCAL_BASE_URL_ENV,
+    JOINTFM_LOCAL_BASE_URLS_ENV,
     JOINTFM_MODEL_VERSION_ENV,
     JOINTFM_PREDICT_URL_ENV,
     JOINTFM_PULUMI_OUTPUTS_PATH_ENV,
@@ -283,12 +284,12 @@ def test_load_settings_resolves_named_pulumi_target_from_saved_outputs(
     """Load settings resolves named pulumi target from saved outputs."""
     outputs_path = tmp_path / "jointfm-pulumi-outputs.json"
     outputs_path.write_text(
-        json.dumps({"fin-studentt": {"deployment_id": "pulumi-deployment-id"}}),
+        json.dumps({"my-target": {"deployment_id": "pulumi-deployment-id"}}),
         encoding="utf-8",
     )
     env = _hosted_env(
         **{
-            JOINTFM_DEPLOYMENT_TARGET_ENV: "fin-studentt",
+            JOINTFM_DEPLOYMENT_TARGET_ENV: "my-target",
             JOINTFM_PULUMI_OUTPUTS_PATH_ENV: str(outputs_path),
         }
     )
@@ -296,7 +297,7 @@ def test_load_settings_resolves_named_pulumi_target_from_saved_outputs(
 
     settings = load_settings(env=env, dotenv_path=None)
 
-    assert settings.deployment_target == "fin-studentt"
+    assert settings.deployment_target == "my-target"
     assert settings.deployment_id == "pulumi-deployment-id"
     assert settings.predict_url == (
         "https://app.datarobot.com/api/v2/deployments/"
@@ -335,12 +336,12 @@ def test_load_settings_resolves_named_pulumi_target_url_outputs(
     """Load settings resolves named pulumi target url outputs."""
     outputs_path = tmp_path / "jointfm-pulumi-outputs.json"
     outputs_path.write_text(
-        json.dumps({"fin-studentt": target_outputs}),
+        json.dumps({"my-target": target_outputs}),
         encoding="utf-8",
     )
     env = _hosted_env(
         **{
-            JOINTFM_DEPLOYMENT_TARGET_ENV: "fin-studentt",
+            JOINTFM_DEPLOYMENT_TARGET_ENV: "my-target",
             JOINTFM_PULUMI_OUTPUTS_PATH_ENV: str(outputs_path),
         }
     )
@@ -349,7 +350,7 @@ def test_load_settings_resolves_named_pulumi_target_url_outputs(
     settings = load_settings(env=env, dotenv_path=None)
 
     assert settings.deployment_selector == "pulumi_target"
-    assert settings.deployment_target == "fin-studentt"
+    assert settings.deployment_target == "my-target"
     assert settings.deployment_id == expected_deployment_id
     assert settings.predict_url == (
         "https://app.datarobot.com/api/v2/deployments/"
@@ -360,10 +361,10 @@ def test_load_settings_resolves_named_pulumi_target_url_outputs(
 def test_load_settings_rejects_pulumi_target_without_url_outputs(tmp_path) -> None:
     """Load settings rejects pulumi target without url outputs."""
     outputs_path = tmp_path / "jointfm-pulumi-outputs.json"
-    outputs_path.write_text(json.dumps({"fin-studentt": {}}), encoding="utf-8")
+    outputs_path.write_text(json.dumps({"my-target": {}}), encoding="utf-8")
     env = _hosted_env(
         **{
-            JOINTFM_DEPLOYMENT_TARGET_ENV: "fin-studentt",
+            JOINTFM_DEPLOYMENT_TARGET_ENV: "my-target",
             JOINTFM_PULUMI_OUTPUTS_PATH_ENV: str(outputs_path),
         }
     )
@@ -383,12 +384,10 @@ def test_load_settings_rejects_invalid_pulumi_outputs(tmp_path) -> None:
     missing_target_path = tmp_path / "missing-target.json"
     missing_target_path.write_text(json.dumps({"other": {}}), encoding="utf-8")
     non_object_target_path = tmp_path / "non-object-target.json"
-    non_object_target_path.write_text(
-        json.dumps({"fin-studentt": []}), encoding="utf-8"
-    )
+    non_object_target_path.write_text(json.dumps({"my-target": []}), encoding="utf-8")
     invalid_output_path = tmp_path / "invalid-output.json"
     invalid_output_path.write_text(
-        json.dumps({"fin-studentt": {"deployment_id": ""}}),
+        json.dumps({"my-target": {"deployment_id": ""}}),
         encoding="utf-8",
     )
 
@@ -404,7 +403,7 @@ def test_load_settings_rejects_invalid_pulumi_outputs(tmp_path) -> None:
     for outputs_path, expected_message in invalid_cases:
         env = _hosted_env(
             **{
-                JOINTFM_DEPLOYMENT_TARGET_ENV: "fin-studentt",
+                JOINTFM_DEPLOYMENT_TARGET_ENV: "my-target",
                 JOINTFM_PULUMI_OUTPUTS_PATH_ENV: str(outputs_path),
             }
         )
@@ -513,7 +512,7 @@ def test_load_settings_with_deployment_ids_builds_instance_pool() -> None:
     settings = load_settings(env=env, dotenv_path=None)
 
     assert settings.deployment_selector == "deployment_ids"
-    assert [instance.deployment_id for instance in settings.instances] == [
+    assert [instance.instance_id for instance in settings.instances] == [
         "primary-id",
         "backup-id",
     ]
@@ -544,4 +543,83 @@ def test_load_settings_rejects_deployment_ids_with_fewer_than_two_unique_ids() -
     env = _hosted_env(**{JOINTFM_DEPLOYMENT_IDS_ENV: "same-id,same-id"})
     del env[JOINTFM_DEPLOYMENT_ID_ENV]
     with pytest.raises(JointFMConfigurationError, match="at least two unique"):
+        load_settings(env=env, dotenv_path=None)
+
+
+def _local_pool_env(base_urls: str) -> dict[str, str]:
+    """Credential-free env selecting a local service pool."""
+    return {
+        JOINTFM_LOCAL_BASE_URLS_ENV: base_urls,
+        JOINTFM_SCHEMA_VERSION_ENV: "v5",
+    }
+
+
+def test_load_settings_with_local_base_urls_builds_local_instance_pool() -> None:
+    """Each local base URL becomes a pool instance named by its normalized URL."""
+    settings = load_settings(
+        env=_local_pool_env("http://127.0.0.1:8080/,http://127.0.0.1:8081"),
+        dotenv_path=None,
+    )
+
+    assert settings.deployment_selector == "local_services"
+    assert settings.is_local
+    assert settings.datarobot_endpoint is None
+    assert settings.datarobot_api_token is None
+    assert settings.deployment_id is None
+    assert [instance.instance_id for instance in settings.instances] == [
+        "http://127.0.0.1:8080",
+        "http://127.0.0.1:8081",
+    ]
+    assert [instance.predict_url for instance in settings.instances] == [
+        "http://127.0.0.1:8080/predict",
+        "http://127.0.0.1:8081/predict",
+    ]
+    assert settings.local_base_url == "http://127.0.0.1:8080"
+    assert settings.health_url == "http://127.0.0.1:8080/healthz"
+    assert settings.predict_url == "http://127.0.0.1:8080/predict"
+
+
+@pytest.mark.parametrize(
+    "base_urls",
+    ["http://127.0.0.1:8080", "http://127.0.0.1:8080/,http://127.0.0.1:8080"],
+)
+def test_load_settings_rejects_local_base_urls_with_fewer_than_two_unique_urls(
+    base_urls: str,
+) -> None:
+    """URLs that normalize to the same service count once."""
+    with pytest.raises(JointFMConfigurationError, match="at least two unique"):
+        load_settings(env=_local_pool_env(base_urls), dotenv_path=None)
+
+
+@pytest.mark.parametrize(
+    ("base_urls", "message"),
+    [
+        ("http://127.0.0.1:8080,,http://127.0.0.1:8081", "must be non-empty"),
+        ("http://127.0.0.1:8080, http://127.0.0.1:8081", "must not contain whitespace"),
+        ("ftp://127.0.0.1:8080,http://127.0.0.1:8081", "must be an http or https URL"),
+        ("http://127.0.0.1:8080?x=1,http://127.0.0.1:8081", "must not include params"),
+    ],
+)
+def test_load_settings_rejects_malformed_local_base_urls(
+    base_urls: str, message: str
+) -> None:
+    """Every entry is validated like JOINTFM_LOCAL_BASE_URL and named by the list."""
+    with pytest.raises(
+        JointFMConfigurationError, match=f"{JOINTFM_LOCAL_BASE_URLS_ENV} {message}"
+    ):
+        load_settings(env=_local_pool_env(base_urls), dotenv_path=None)
+
+
+@pytest.mark.parametrize(
+    "other_selector",
+    [JOINTFM_LOCAL_BASE_URL_ENV, JOINTFM_DEPLOYMENT_IDS_ENV, JOINTFM_DEPLOYMENT_ID_ENV],
+)
+def test_load_settings_rejects_local_base_urls_combined_with_another_selector(
+    other_selector: str,
+) -> None:
+    """The local pool selector is mutually exclusive with every other selector."""
+    env = _local_pool_env("http://127.0.0.1:8080,http://127.0.0.1:8081")
+    env[other_selector] = "other-value"
+
+    with pytest.raises(JointFMConfigurationError, match="cannot be combined"):
         load_settings(env=env, dotenv_path=None)
