@@ -82,6 +82,7 @@ def _health_metadata() -> dict[str, object]:
         "checkpoint_version": "smoke-1",
         "checkpoint_path": "/models/jointfm.pt",
         "device": "cpu",
+        "generation": "jointfm-1",
         "head": "dummy",
         "decoding_strategy": "parallel_dense",
         "supported_query_modes": ["forecast"],
@@ -92,7 +93,7 @@ def _health_metadata() -> dict[str, object]:
             "continuous_float",
             "ordinal",
         ],
-        "time_index_encoding": "legacy_discrete_grid",
+        "time_index_encoding": "discrete_grid",
         "max_sample_count": 4096,
         "max_concurrent_requests": 1,
         "data_generation": {
@@ -814,6 +815,27 @@ def test_health_metadata_parses_the_series_envelope() -> None:
     assert health.data_generation is not None
     assert health.data_generation.min_series == 1
     assert health.data_generation.max_series == 16
+
+
+def test_health_metadata_parses_the_generation() -> None:
+    """The served generation is read from its own field, not inferred from another."""
+    metadata = _health_metadata()
+    metadata["generation"] = "jointfm-2"
+
+    assert HealthMetadata.from_payload(metadata).generation == "jointfm-2"
+
+
+@pytest.mark.parametrize("value", [None, "", 2])
+def test_health_metadata_requires_the_generation(value: object) -> None:
+    """A deployment that does not name its generation fails instead of parsing."""
+    metadata = _health_metadata()
+    if value is None:
+        del metadata["generation"]
+    else:
+        metadata["generation"] = value
+
+    with pytest.raises(ValueError, match="generation"):
+        HealthMetadata.from_payload(metadata)
 
 
 @pytest.mark.parametrize("value", [None, 0, 1.5])

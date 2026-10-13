@@ -170,7 +170,7 @@ class JointFMHTTPTransport:
     ) -> "JointFMHTTPTransport":
         """Create an HTTP transport from hosted or local SDK settings."""
         headers = None
-        if settings.deployment_selector != "local_service":
+        if not settings.is_local:
             if settings.datarobot_api_token is None:
                 raise JointFMConfigurationError(
                     "hosted JointFM settings require a DataRobot API token"

@@ -64,6 +64,7 @@ class FakeHealthClient:
             checkpoint_version="sdk-test",
             checkpoint_path="/models/jointfm.pt",
             device="cpu",
+            generation="jointfm-1",
             head="studentt",
             decoding_strategy="parallel_dense",
             supported_query_modes=("forecast",),
@@ -74,7 +75,7 @@ class FakeHealthClient:
                 "continuous_float",
                 "absolute_datetime",
             ),
-            time_index_encoding="legacy_discrete_grid",
+            time_index_encoding="discrete_grid",
             max_sample_count=4096,
             max_concurrent_requests=1,
         )
@@ -87,7 +88,7 @@ class FakeHealthClient:
         return HealthInstances.from_instances(
             (
                 InstanceHealth(
-                    deployment_id="deployment-id",
+                    instance_id="deployment-id",
                     metadata=self.health(),
                 ),
             )
@@ -153,7 +154,7 @@ def test_health_command_prints_non_secret_metadata(monkeypatch, capsys) -> None:
     assert payload["deployment"]["deployment_id"] == "deployment-id"
     assert payload["instances"] == [
         {
-            "deployment_id": "deployment-id",
+            "instance_id": "deployment-id",
             "available": True,
             "max_sample_count": 4096,
             "max_concurrent_requests": 1,

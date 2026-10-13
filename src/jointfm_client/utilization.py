@@ -78,7 +78,7 @@ class MaxUtilizationReport:
     """Verdict and timings of one maximum-utilization check.
 
     ``envelope`` is the advertised capacity the requests were sized from.
-    ``unavailable_instances`` lists configured deployment IDs that failed the
+    ``unavailable_instances`` lists configured instance IDs that failed the
     health probe; any entry fails the check, because the pool then runs below
     its configured capacity. ``request_slots`` is the sum of
     ``max_concurrent_requests`` over the reachable endpoints.
@@ -111,8 +111,8 @@ class MaxUtilizationReport:
             f"health probe:  {self.health_seconds:.2f}s",
         ]
         lines.extend(
-            f"unavailable:   {deployment_id}"
-            for deployment_id in self.unavailable_instances
+            f"unavailable:   {instance_id}"
+            for instance_id in self.unavailable_instances
         )
         stage = self.concurrent_saturation
         status = "PASS" if stage.passed else "FAIL"
@@ -156,7 +156,7 @@ class _MaximalRequest:
 class _RequestSlot:
     """One request the saturation stage sends at the same time as the others."""
 
-    deployment_id: str | None
+    instance_id: str | None
     n_samples: int
     seed: int
 
@@ -218,18 +218,18 @@ def run_max_utilization_check(
         query_times=list(range(envelope.n_input, envelope.n_input + envelope.n_output)),
     )
     endpoint_slots = [
-        (instance.deployment_id, instance.metadata)
+        (instance.instance_id, instance.metadata)
         for instance in instances.instances
         if instance.metadata is not None
         for _ in range(instance.metadata.max_concurrent_requests)
     ]
     slots = tuple(
         _RequestSlot(
-            deployment_id=deployment_id,
+            instance_id=instance_id,
             n_samples=metadata.max_sample_count,
             seed=seed + index,
         )
-        for index, (deployment_id, metadata) in enumerate(endpoint_slots)
+        for index, (instance_id, metadata) in enumerate(endpoint_slots)
     )
 
     concurrent_saturation = _run_concurrent_saturation(
@@ -242,7 +242,7 @@ def run_max_utilization_check(
         topology_label=instances.topology_label,
         request_slots=len(slots),
         unavailable_instances=tuple(
-            str(instance.deployment_id)
+            str(instance.instance_id)
             for instance in instances.instances
             if instance.metadata is None
         ),
@@ -265,7 +265,7 @@ def _run_concurrent_saturation(
     forecast is sent.
     """
     total_samples = sum(slot.n_samples for slot in slots)
-    slot_clients = tuple(client.endpoint_client(slot.deployment_id) for slot in slots)
+    slot_clients = tuple(client.endpoint_client(slot.instance_id) for slot in slots)
     try:
         for slot_client in slot_clients:
             slot_client.health(cache=True)
@@ -291,9 +291,7 @@ def _run_concurrent_saturation(
         # Recorded per slot for the same reason as a failed health probe.
         except JointFMError as caught:
             error = f"{type(caught).__name__}: {caught}"
-        return (
-            None if error is None else f"slot {index} ({slot.deployment_id}): {error}"
-        )
+        return None if error is None else f"slot {index} ({slot.instance_id}): {error}"
 
     started = time.perf_counter()
     with ThreadPoolExecutor(max_workers=len(slots)) as executor:

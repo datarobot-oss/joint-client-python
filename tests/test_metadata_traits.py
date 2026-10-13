@@ -42,6 +42,7 @@ def _health(traits: list[str] | None) -> dict[str, Any]:
         "checkpoint_version": "smoke-1",
         "checkpoint_path": "/models/jointfm.pt",
         "device": "cpu",
+        "generation": "jointfm-1",
         "head": "gmm",
         "decoding_strategy": "parallel_dense",
         "supported_query_modes": ["forecast"],
@@ -52,7 +53,7 @@ def _health(traits: list[str] | None) -> dict[str, Any]:
             "continuous_float",
             "absolute_datetime",
         ],
-        "time_index_encoding": "legacy_discrete_grid",
+        "time_index_encoding": "discrete_grid",
         "max_sample_count": 64,
         "max_concurrent_requests": 1,
     }

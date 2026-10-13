@@ -38,7 +38,7 @@ The direct local service exposes `GET /healthz` and `POST /predict`.
 
 Structured SDK defaults live in `jointfm_client.configuration.JointFMConfig` and are mirrored in the checked-in `config.sample.yaml`. Copy `config.sample.yaml` to `config.yaml` and change only the fields needed for your deployment or transport defaults. `JointFMClient.from_env()` and `load_settings()` read `config.yaml` by default, then layer `.env` values over it, then layer process environment variables or the supplied `env` mapping over both. Explicit Python arguments such as `timeout=` and `retry_config=` still override YAML transport defaults.
 
-`JointFMClient.from_env()` and `load_settings()` resolve `JOINTFM_SCHEMA_VERSION` and exactly one service selector from that layered configuration. Hosted options include `JOINTFM_DEPLOYMENT_ID` or load-balanced `JOINTFM_DEPLOYMENT_IDS` (comma-separated same-checkpoint peers; mutually exclusive with other selectors). `JOINTFM_MODEL_VERSION` is optional: when unset the SDK discovers the model version from `/healthz` on first use, and when set the SDK validates it against `/healthz` as a drift-detection guard. Hosted selectors also require `DATAROBOT_ENDPOINT` and `DATAROBOT_API_TOKEN`; the direct local selector does not use DataRobot credentials. Missing credentials, missing schema version, malformed credentials, unsupported schema versions, missing selectors, and multiple selectors raise `JointFMConfigurationError`.
+`JointFMClient.from_env()` and `load_settings()` resolve `JOINTFM_SCHEMA_VERSION` and exactly one service selector from that layered configuration. Hosted options include `JOINTFM_DEPLOYMENT_ID` or load-balanced `JOINTFM_DEPLOYMENT_IDS` (comma-separated same-checkpoint peers; mutually exclusive with other selectors). `JOINTFM_MODEL_VERSION` is optional: when unset the SDK discovers the model version from `/healthz` on first use, and when set the SDK validates it against `/healthz` as a drift-detection guard. Local options are `JOINTFM_LOCAL_BASE_URL` or load-balanced `JOINTFM_LOCAL_BASE_URLS` (comma-separated same-checkpoint local services; mutually exclusive with other selectors). Hosted selectors also require `DATAROBOT_ENDPOINT` and `DATAROBOT_API_TOKEN`; the local selectors do not use DataRobot credentials. Missing credentials, missing schema version, malformed credentials, unsupported schema versions, missing selectors, and multiple selectors raise `JointFMConfigurationError`.
 
 `DATAROBOT_ENDPOINT` must be a normalized HTTPS DataRobot API v2 URL ending in `/api/v2`; the SDK stores it without a trailing slash. `DATAROBOT_API_TOKEN` must be non-empty and whitespace-free. The token is excluded from `JointFMSettings` repr output.
 
@@ -53,7 +53,7 @@ deployment:
 	schema_version: v5
 	deployment_id: <deployment-id>
 	# Optional model-version pin; the SDK discovers it from /healthz when unset:
-	# model_version: jointfm-inference:0.3.0+ckpt.fin-2026-05-22
+	# model_version: jointfm-inference:<image-version>+ckpt.<checkpoint-version>
 transport:
 	timeout:
 		connect_seconds: 10.0
@@ -71,16 +71,16 @@ DATAROBOT_API_TOKEN=<token>
 JOINTFM_SCHEMA_VERSION=v5
 JOINTFM_DEPLOYMENT_ID=<deployment-id>
 # Optional drift-detection pin; the SDK discovers the model version from /healthz when unset:
-# JOINTFM_MODEL_VERSION=jointfm-inference:0.3.0+ckpt.fin-2026-05-22
+# JOINTFM_MODEL_VERSION=jointfm-inference:<image-version>+ckpt.<checkpoint-version>
 ```
 
-Equivalent local REST configuration for a service started from the `joint` repository with `task service:start CONFIG=nvidia-studentt-m4cr2`:
+Equivalent configuration for a JointFM inference service you run yourself:
 
 ```dotenv
 JOINTFM_LOCAL_BASE_URL=http://127.0.0.1:8080
 JOINTFM_SCHEMA_VERSION=v5
 # Optional drift-detection pin; the SDK discovers the model version from /healthz when unset:
-# JOINTFM_MODEL_VERSION=jointfm-inference:0.3.0+ckpt.fin_i504_o63_f0_t10_h16l16_mam7_af_t3r1_cnn_k3l4_hpst_h16l2_studentt_m4cr2df8skew
+# JOINTFM_MODEL_VERSION=jointfm-inference:<image-version>+ckpt.<checkpoint-version>
 ```
 
 Choose exactly one service selector:
@@ -91,12 +91,13 @@ Choose exactly one service selector:
 - `JOINTFM_PREDICT_URL`: uses a full hosted prediction URL ending in `/predictionsUnstructured`
 - `JOINTFM_DEPLOYMENT_TARGET` with `JOINTFM_PULUMI_OUTPUTS_PATH`: resolves a named target from saved Pulumi outputs JSON, preferring `deployment_id`, then `deployment_url`, then `predict_url`
 - `JOINTFM_LOCAL_BASE_URL`: builds direct local `GET /healthz` and `POST /predict` URLs without DataRobot authentication
+- `JOINTFM_LOCAL_BASE_URLS`: comma-separated local service base URLs (≥2 unique after normalization, same checkpoint), for example one instance per GPU on distinct ports, load-balanced exactly like `JOINTFM_DEPLOYMENT_IDS` and without DataRobot authentication; mutually exclusive with other selectors
 
 Pulumi deployment discovery is explicit and file-backed. Export stack outputs to a JSON object keyed by target name, then set `JOINTFM_DEPLOYMENT_TARGET` to the key and `JOINTFM_PULUMI_OUTPUTS_PATH` to that JSON file:
 
 ```json
 {
-	"fin-studentt": {
+	"my-target": {
 		"deployment_id": "<deployment-id>"
 	}
 }
@@ -118,9 +119,9 @@ The SDK still decodes hosted prediction responses as JSON; the broad `Accept` va
 
 Direct local URL helpers are used by the local service selector: `build_local_health_url("http://localhost:8080")` returns `/healthz`, and `build_local_predict_url("http://localhost:8080")` returns `/predict`.
 
-Hosted settings also derive `health_url` from the resolved deployment URL as `deployments/{deployment_id}/healthz`. `JointFMClient.health(cache=True)` stores typed `HealthMetadata` only when the caller asks for caching, and `JointFMClient.refresh_health()` fetches a fresh copy.
+Hosted deployments are probed through the prediction route: `health()` POSTs `{"request_type": "health"}` to the resolved `predict_url`, because the DataRobot deployment gateway proxies only the unstructured prediction route. `JointFMClient.health(cache=True)` stores typed `HealthMetadata` only when the caller asks for caching, and `JointFMClient.refresh_health()` fetches a fresh copy.
 
-Each endpoint's health payload describes only that endpoint. With `JOINTFM_DEPLOYMENT_IDS`, the client probes every configured peer and aggregates locally: `health()` returns consensus metadata whose `max_sample_count` is the **minimum** reachable cap (the sample-batch size), while `health_instances()` returns one `InstanceHealth` per configured ID plus the **sum** of reachable caps (one request per instance; each instance's `max_concurrent_requests` says how many such requests it serves at once), a compact `topology` / `topology_label` (for example `2x5000` or `1x7000, 1x3000`), and errors for unavailable peers.
+Each endpoint's health payload describes only that endpoint. With a pool (`JOINTFM_DEPLOYMENT_IDS` or `JOINTFM_LOCAL_BASE_URLS`), the client probes every configured peer by POSTing `{"request_type": "health"}` to its prediction route, which local services answer as well, and aggregates locally: `health()` returns consensus metadata whose `max_sample_count` is the **minimum** reachable cap (the sample-batch size), while `health_instances()` returns one `InstanceHealth` per configured instance, named by its `instance_id` (the deployment ID, or the local base URL), plus the **sum** of reachable caps (one request per instance; each instance's `max_concurrent_requests` says how many such requests it serves at once), a compact `topology` / `topology_label` (for example `2x5000` or `1x7000, 1x3000`), and errors for unavailable peers.
 
 ## CLI Workflows
 
@@ -157,7 +158,7 @@ Check that the deployment serves the largest request its health envelope adverti
 uv run jointfm-client max-utilization
 ```
 
-`max-utilization` fills every request slot at once with a seeded synthetic sample forecast of `max_series` target columns, an `n_input`-row history, an `n_output`-step horizon, and `max_sample_count` samples: each reachable endpoint (every pool instance with `JOINTFM_DEPLOYMENT_IDS`) receives as many simultaneous maximal requests as its `max_concurrent_requests` admits. It prints the burst's wall-clock time and a final `VERDICT: PASS` or `VERDICT: FAIL` line. It exits with status 1 on FAIL: when a request raises a service or transport error or returns the wrong sample count, or when an endpoint fails the health probe. Retries are disabled for this command, so a request that fails under load is reported instead of retried. Each run uses real GPU time on the deployment. `task max-utilization` runs the same command, and `notebooks/max_utilization.ipynb` shows the burst timing as a table.
+`max-utilization` fills every request slot at once with a seeded synthetic sample forecast of `max_series` target columns, an `n_input`-row history, an `n_output`-step horizon, and `max_sample_count` samples: each reachable endpoint (every pool instance with `JOINTFM_DEPLOYMENT_IDS` or `JOINTFM_LOCAL_BASE_URLS`) receives as many simultaneous maximal requests as its `max_concurrent_requests` admits. It prints the burst's wall-clock time and a final `VERDICT: PASS` or `VERDICT: FAIL` line. It exits with status 1 on FAIL: when a request raises a service or transport error or returns the wrong sample count, or when an endpoint fails the health probe. Retries are disabled for this command, so a request that fails under load is reported instead of retried. Each run uses real GPU time on the deployment. `task max-utilization` runs the same command, and `notebooks/max_utilization.ipynb` shows the burst timing as a table.
 
 ## Notebook Workflows
 
@@ -183,7 +184,7 @@ The current forecast request contract is:
 - `time_column`: required for `"absolute_datetime"`, and used for ordered ordinal or continuous histories when supplied
 - `query_times`: non-empty future forecast times only
 - `requested_columns`: optional column names or integer column indices, with duplicates rejected
-- `n_samples`: positive sample count for sampled forecasts and quantile estimation. When `return_mode="samples"` exceeds the `max_sample_count` advertised by the deployment's health metadata, `forecast_samples(...)` splits the request into capped prediction batches up front and returns one merged `SampleForecastResult`. With `JOINTFM_DEPLOYMENT_IDS`, every sample request is split evenly across all reachable endpoints, whatever its size, and each endpoint serves at most one of its batches at a time. Batch `i` uses seed `seed + i`, so a seeded result depends on how many endpoints were reachable.
+- `n_samples`: positive sample count for sampled forecasts and quantile estimation. When `return_mode="samples"` exceeds the `max_sample_count` advertised by the deployment's health metadata, `forecast_samples(...)` splits the request into capped prediction batches up front and returns one merged `SampleForecastResult`. With a pool (`JOINTFM_DEPLOYMENT_IDS` or `JOINTFM_LOCAL_BASE_URLS`), every sample request is split evenly across all reachable endpoints, whatever its size, and each endpoint serves at most one of its batches at a time. Batch `i` uses seed `seed + i`, so a seeded result depends on how many endpoints were reachable.
 - `condition`: required with `query_mode="condition"` and forbidden otherwise. One `EqualityCondition` or `IntervalCondition`, or a list of them, each covering the future positions its `query_time_indices` names; sent on the wire as the `conditions` list, see below.
 
 ### Conditional Queries
@@ -290,9 +291,9 @@ DATAROBOT_ENDPOINT=https://app.datarobot.com/api/v2
 DATAROBOT_API_TOKEN=<token>
 JOINTFM_SCHEMA_VERSION=v5
 JOINTFM_DEPLOYMENT_ID=<deployment-id>
-# Or: JOINTFM_DEPLOYMENT_IDS=chevron-id,research-id
+# Or: JOINTFM_DEPLOYMENT_IDS=<deployment-id-1>,<deployment-id-2>
 # Optional drift-detection pin; the SDK discovers the model version from /healthz when unset:
-# JOINTFM_MODEL_VERSION=jointfm-inference:0.3.0+ckpt.fin-2026-05-22
+# JOINTFM_MODEL_VERSION=jointfm-inference:<image-version>+ckpt.<checkpoint-version>
 ```
 
 Check that the SDK can resolve the deployment and that the service metadata matches the configured schema and model pins:
