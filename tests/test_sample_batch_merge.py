@@ -58,6 +58,7 @@ def _health_payload(*, max_sample_count: int) -> dict[str, object]:
         "checkpoint_version": "sdk-test",
         "checkpoint_path": "/models/jointfm.pt",
         "device": "cpu",
+        "generation": "jointfm-1",
         "head": "studentt",
         "decoding_strategy": "parallel_dense",
         "supported_query_modes": ["forecast"],
@@ -68,7 +69,7 @@ def _health_payload(*, max_sample_count: int) -> dict[str, object]:
             "continuous_float",
             "absolute_datetime",
         ],
-        "time_index_encoding": "legacy_discrete_grid",
+        "time_index_encoding": "discrete_grid",
         "max_sample_count": max_sample_count,
         "max_concurrent_requests": 1,
     }
@@ -214,8 +215,8 @@ def _pool_client(transport: _BatchTransport) -> JointFMClient:
         deployment_selector="deployment_ids",
         schema_version="v5",
         instances=(
-            JointFMInstanceSettings(deployment_id="primary-id", predict_url=_PRIMARY),
-            JointFMInstanceSettings(deployment_id="backup-id", predict_url=_BACKUP),
+            JointFMInstanceSettings(instance_id="primary-id", predict_url=_PRIMARY),
+            JointFMInstanceSettings(instance_id="backup-id", predict_url=_BACKUP),
         ),
         model_version=_MODEL_VERSION,
         deployment_id="primary-id",
