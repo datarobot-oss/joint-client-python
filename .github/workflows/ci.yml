@@ -65,3 +65,36 @@ jobs:
 
             - name: Build and validate distribution
               run: task build
+
+    leak-guard-new-commits:
+        name: task leak-guard:history (new commits)
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        steps:
+            - name: Checkout with full history
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Install Task
+              uses: arduino/setup-task@v2
+              with:
+                  version: 3.x
+                  repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Install uv with cache
+              uses: astral-sh/setup-uv@v6
+              with:
+                  version: "0.10.12"
+                  python-version: "3.13.3"
+                  enable-cache: true
+                  cache-dependency-glob: |
+                      uv.lock
+                      pyproject.toml
+
+            # History published before the leak guard existed cannot be cleaned,
+            # so CI scans only the commits this pull request or push adds.
+            - name: Scan the commits this pull request or push adds
+              env:
+                  REVISIONS: ${{ github.event_name == 'pull_request' && format('origin/{0}..HEAD', github.base_ref) || format('{0}..{1}', github.event.before, github.sha) }}
+              run: task leak-guard:history -- "$REVISIONS"

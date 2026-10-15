@@ -48,6 +48,26 @@ tasks:
     desc: Run ty static type checks
     cmd: uv run ty check --output-format concise --error-on-warning
 
+  leak-guard:
+    desc: Fail when a tracked or untracked, non-ignored file carries private material in its path or content
+    cmd: |
+      if uv run python scripts/leak_guard.py tree; then
+        echo "OK: leak guard found no private material in the working tree"
+      else
+        echo "FAIL: leak guard found private material in the working tree"
+        exit 1
+      fi
+
+  leak-guard:history:
+    desc: "Fail when a commit carries private material in its message, paths, or file contents; scans every ref unless given revisions (task leak-guard:history -- origin/main..HEAD)"
+    cmd: |
+      if uv run python scripts/leak_guard.py history {{.CLI_ARGS}}; then
+        echo "OK: leak guard found no private material in the scanned history"
+      else
+        echo "FAIL: leak guard found private material in the scanned history"
+        exit 1
+      fi
+
   test:
     desc: Run the unit test suite
     cmd: uv run pytest -n auto
@@ -208,6 +228,7 @@ tasks:
       if [ -s .git/COMMIT_EDITMSG ]; then
         uv run cz check --commit-msg-file .git/COMMIT_EDITMSG
         MSG_STATUS=$?
+        uv run python scripts/leak_guard.py message .git/COMMIT_EDITMSG || MSG_STATUS=1
       fi
       if [ "$PRE_COMMIT_STATUS" -ne 0 ] || [ "$MSG_STATUS" -ne 0 ]; then
         exit 1

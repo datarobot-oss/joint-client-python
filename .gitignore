@@ -219,5 +219,7 @@ __marimo__/
 
 # custom
 private/
+# Leak guard: maintainers' private patterns, which name the material they guard
+/.leak-patterns.private
 notebooks/forecast.csv
 config.yaml

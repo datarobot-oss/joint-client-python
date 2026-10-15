@@ -354,6 +354,8 @@ Use `forecast_samples(...)` for sampled trajectories or `forecast_quantiles(...)
 - `task release`: cut a SemVer release with Commitizen (writes `CHANGELOG.md`, bumps versions, creates tag)
 - `task release:publish`: push the release commit and its tag to `origin`, which triggers the PyPI publish workflow
 - `task pre-commit`: run every configured pre-commit hook
+- `task leak-guard`: fail when a file in the working tree carries private material in its path or content
+- `task leak-guard:history`: fail when a commit carries private material in its message, paths, or files; pass revisions to narrow the scan (`task leak-guard:history -- origin/main..HEAD`)
 
 Contributors do not need to add copyright or license headers manually. The `insert-license` pre-commit hook runs [skywalking-eyes](https://github.com/apache/skywalking-eyes) (via the `apache/skywalking-eyes` Docker image, so a running Docker daemon is required) to stamp the standard Apache-2.0 header (`Copyright 2026 DataRobot, Inc. and its affiliates.` followed by the standard "Licensed under the Apache License, Version 2.0" notice) into every `.py` file, and the companion `insert-license-notebooks` hook stamps the same notice into a leading markdown cell of every notebook the first time you run `task pre-commit`. Verify the headers are present at any time with `task license-check`.
 
@@ -364,6 +366,12 @@ sudo usermod -aG docker "$USER"
 ```
 
 Group membership is captured when a process starts, so it must be in effect **before** the editor or its language server launches — start a fresh login session (or reboot) after adding yourself to the group, otherwise the commit hook inherits the old groups and fails with a Docker permission error.
+
+### Leak guard
+
+This repository is public, so `scripts/leak_guard.py` fails on material that must stay private: proprietary file headers, DataRobot object IDs, internal hosts and private addresses, links to non-public repositories, planning labels, and credential shapes. It runs as a pre-commit hook over the working tree, as a `commit-msg` hook over each message, and in CI over every commit a pull request or push adds. Commits published before the guard existed cannot be cleaned, so CI does not scan the full history.
+
+Some rules cannot be published because they name what they guard. Maintainers keep those in a git-ignored `.leak-patterns.private` at the repository root: one Python regular expression per line, blank lines and `#` comment lines skipped. The guard reports whether it loaded the file and runs the public rules alone when it is absent, as in CI. A dangling link fails. A passing guard does not prove a change safe to publish.
 
 ## Versioning & Commits
 
