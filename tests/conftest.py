@@ -18,12 +18,27 @@ from __future__ import annotations
 
 from collections.abc import Callable
 import json
+import os
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 _FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures"
+GIT_ENVIRONMENT_PREFIX = "GIT_"
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Remove every ``GIT_*`` variable before any fixture or xdist worker starts.
+
+    A hook run by ``git commit -a`` exports an absolute ``GIT_INDEX_FILE`` that
+    points at this repository's ``index.lock``; a test that runs git in a
+    temporary repository would otherwise read and write that index instead.
+    """
+    for name in [
+        name for name in os.environ if name.startswith(GIT_ENVIRONMENT_PREFIX)
+    ]:
+        del os.environ[name]
 
 
 def _load_json_fixture(name: str) -> dict[str, Any]:
