@@ -10,6 +10,16 @@ Releases are cut with `task release`, which uses Commitizen to read
 release tag, infer the next SemVer bump, prepend the new section here,
 commit the bump, and create an annotated tag.
 
+## v0.13.0 (2026-10-16)
+
+### Feat
+
+- Speak service schema v6, add leak guard (#23)
+
+### Fix
+
+- Isolate tests from the calling git process's environment (#24)
+
 ## v0.12.0 (2026-10-13)
 
 ### Feat
