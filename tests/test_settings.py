@@ -55,7 +55,7 @@ def _hosted_env(**overrides: str) -> dict[str, str]:
         DATAROBOT_ENDPOINT_ENV: "https://app.datarobot.com/api/v2/",
         DATAROBOT_API_TOKEN_ENV: "secret-token",
         JOINTFM_DEPLOYMENT_ID_ENV: "deployment-id",
-        JOINTFM_SCHEMA_VERSION_ENV: "v5",
+        JOINTFM_SCHEMA_VERSION_ENV: "v6",
         JOINTFM_MODEL_VERSION_ENV: "jointfm-inference:0.3.0+ckpt.sdk-test",
     }
     env.update(overrides)
@@ -67,7 +67,7 @@ def test_load_settings_from_environment_with_deployment_id_builds_hosted_url() -
     settings = load_settings(env=_hosted_env(), dotenv_path=None)
 
     assert settings.datarobot_endpoint == "https://app.datarobot.com/api/v2"
-    assert settings.schema_version == "v5"
+    assert settings.schema_version == "v6"
     assert settings.model_version == "jointfm-inference:0.3.0+ckpt.sdk-test"
     assert settings.deployment_id == "deployment-id"
     assert settings.predict_url == (
@@ -83,7 +83,7 @@ def test_load_settings_with_local_service_base_url_builds_direct_urls() -> None:
     settings = load_settings(
         env={
             JOINTFM_LOCAL_BASE_URL_ENV: "http://127.0.0.1:8080/",
-            JOINTFM_SCHEMA_VERSION_ENV: "v5",
+            JOINTFM_SCHEMA_VERSION_ENV: "v6",
             JOINTFM_MODEL_VERSION_ENV: "jointfm-inference:0.3.0+ckpt.local-test",
         },
         dotenv_path=None,
@@ -159,7 +159,7 @@ def test_load_settings_reads_dotenv_without_overriding_environment(tmp_path) -> 
                 "DATAROBOT_ENDPOINT=https://app.datarobot.com/api/v2",
                 "DATAROBOT_API_TOKEN=file-token",
                 "JOINTFM_DEPLOYMENT_ID=file-deployment-id",
-                "JOINTFM_SCHEMA_VERSION=v5",
+                "JOINTFM_SCHEMA_VERSION=v6",
                 "JOINTFM_MODEL_VERSION=jointfm-inference:0.3.0+ckpt.sdk-test",
             ]
         ),
@@ -210,7 +210,7 @@ def test_load_settings_rejects_missing_credentials_without_defaults() -> None:
             env={
                 DATAROBOT_API_TOKEN_ENV: "secret-token",
                 JOINTFM_DEPLOYMENT_ID_ENV: "deployment-id",
-                JOINTFM_SCHEMA_VERSION_ENV: "v5",
+                JOINTFM_SCHEMA_VERSION_ENV: "v6",
                 JOINTFM_MODEL_VERSION_ENV: "jointfm-inference:0.3.0+ckpt.sdk-test",
             },
             dotenv_path=None,
@@ -221,7 +221,7 @@ def test_load_settings_rejects_missing_credentials_without_defaults() -> None:
             env={
                 DATAROBOT_ENDPOINT_ENV: "https://app.datarobot.com/api/v2",
                 JOINTFM_DEPLOYMENT_ID_ENV: "deployment-id",
-                JOINTFM_SCHEMA_VERSION_ENV: "v5",
+                JOINTFM_SCHEMA_VERSION_ENV: "v6",
                 JOINTFM_MODEL_VERSION_ENV: "jointfm-inference:0.3.0+ckpt.sdk-test",
             },
             dotenv_path=None,
@@ -550,7 +550,7 @@ def _local_pool_env(base_urls: str) -> dict[str, str]:
     """Credential-free env selecting a local service pool."""
     return {
         JOINTFM_LOCAL_BASE_URLS_ENV: base_urls,
-        JOINTFM_SCHEMA_VERSION_ENV: "v5",
+        JOINTFM_SCHEMA_VERSION_ENV: "v6",
     }
 
 

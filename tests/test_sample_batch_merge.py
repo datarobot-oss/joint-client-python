@@ -52,7 +52,7 @@ def _health_payload(*, max_sample_count: int) -> dict[str, object]:
     """Health payload advertising ``max_sample_count``."""
     return {
         "status": "ok",
-        "schema_version": "v5",
+        "schema_version": "v6",
         "image_version": "0.3.0",
         "model_version": _MODEL_VERSION,
         "checkpoint_version": "sdk-test",
@@ -88,7 +88,7 @@ def _samples_response(
 ) -> dict[str, object]:
     """One sample batch response answering ``seed`` and ``sample_count``."""
     return {
-        "schema_version": "v5",
+        "schema_version": "v6",
         "image_version": image_version,
         "model_version": _MODEL_VERSION,
         "checkpoint_version": "sdk-test",
@@ -165,7 +165,7 @@ def _single_endpoint_client(transport: _BatchTransport) -> JointFMClient:
         health_url="http://127.0.0.1:8080/healthz",
         predict_url="http://127.0.0.1:8080/predict",
         deployment_selector="local_service",
-        schema_version="v5",
+        schema_version="v6",
         model_version=_MODEL_VERSION,
         local_base_url="http://127.0.0.1:8080",
     )
@@ -213,7 +213,7 @@ def _pool_client(transport: _BatchTransport) -> JointFMClient:
         health_url=_PRIMARY,
         predict_url=_PRIMARY,
         deployment_selector="deployment_ids",
-        schema_version="v5",
+        schema_version="v6",
         instances=(
             JointFMInstanceSettings(instance_id="primary-id", predict_url=_PRIMARY),
             JointFMInstanceSettings(instance_id="backup-id", predict_url=_BACKUP),

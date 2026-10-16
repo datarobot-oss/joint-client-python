@@ -10,7 +10,7 @@ The SDK targets the DataRobot-hosted unstructured prediction route and the same 
 - Import namespace: `jointfm_client`
 - Supported Python: `>=3.11`
 - Current SDK package version: `0.12.0`
-- Current JointFM service schema: `schema_version="v5"`
+- Current JointFM service schema: `schema_version="v6"`
 
 The public API shape is a synchronous low-level `JointFMClient` with `health()`, `health_instances()`, and `predict(payload)` methods plus high-level `forecast(...)`, `forecast_mean(...)`, `forecast_samples(...)`, and `forecast_quantiles(...)` helpers. The SDK is not a proxy service; callers use it as a local Python library that talks to the hosted or local JointFM endpoint.
 
@@ -50,7 +50,7 @@ Example deployment configuration:
 deployment:
 	datarobot_endpoint: https://app.datarobot.com/api/v2
 	datarobot_api_token: <token>
-	schema_version: v5
+	schema_version: v6
 	deployment_id: <deployment-id>
 	# Optional model-version pin; the SDK discovers it from /healthz when unset:
 	# model_version: jointfm-inference:<image-version>+ckpt.<checkpoint-version>
@@ -68,7 +68,7 @@ Equivalent `.env` deployment configuration:
 ```dotenv
 DATAROBOT_ENDPOINT=https://app.datarobot.com/api/v2
 DATAROBOT_API_TOKEN=<token>
-JOINTFM_SCHEMA_VERSION=v5
+JOINTFM_SCHEMA_VERSION=v6
 JOINTFM_DEPLOYMENT_ID=<deployment-id>
 # Optional drift-detection pin; the SDK discovers the model version from /healthz when unset:
 # JOINTFM_MODEL_VERSION=jointfm-inference:<image-version>+ckpt.<checkpoint-version>
@@ -78,7 +78,7 @@ Equivalent configuration for a JointFM inference service you run yourself:
 
 ```dotenv
 JOINTFM_LOCAL_BASE_URL=http://127.0.0.1:8080
-JOINTFM_SCHEMA_VERSION=v5
+JOINTFM_SCHEMA_VERSION=v6
 # Optional drift-detection pin; the SDK discovers the model version from /healthz when unset:
 # JOINTFM_MODEL_VERSION=jointfm-inference:<image-version>+ckpt.<checkpoint-version>
 ```
@@ -176,7 +176,7 @@ The bootstrap helper resolves the nearest src-layout Python project root, switch
 
 The current forecast request contract is:
 
-- `schema_version`: exactly `"v5"`, configured as `JOINTFM_SCHEMA_VERSION` for `from_env()` clients
+- `schema_version`: exactly `"v6"`, configured as `JOINTFM_SCHEMA_VERSION` for `from_env()` clients
 - `model_version`: exact model version advertised by `/healthz` or otherwise selected by the caller. Optional for `from_env()` clients: when `JOINTFM_MODEL_VERSION` is unset the SDK reads it from `/healthz` on first use; when set it acts as a drift-detection pin
 - `query_mode`: `"forecast"` for the unconditional forecast, or `"condition"` for the forecast given conditions on some columns; the high-level helpers set it from whether a `condition` was passed
 - `return_mode`: one of `"mean"`, `"samples"`, or `"quantiles"`
@@ -232,7 +232,7 @@ Successful forecast responses preserve `schema_version`, `image_version`, `model
 
 ```json
 {
-	"schema_version": "v5",
+	"schema_version": "v6",
 	"errors": [
 		{
 			"code": "VALIDATION_ERROR",
@@ -247,7 +247,7 @@ Known error codes are `VALIDATION_ERROR`, `UNSUPPORTED_HEAD_QUERY_COMBINATION`, 
 
 ## Compatibility Policy
 
-The SDK supports only `schema_version="v5"`. `validate_service_metadata()` checks `/healthz` metadata and raises typed compatibility errors before prediction if the service advertises a different schema, an unexpected model version, mode capabilities outside the recorded service contract, or an unsupported `decoding_strategy`. Return modes and time-index modes must match the SDK's lists exactly. Query modes and condition kinds are derived by the service from the mounted head, so a deployment may advertise fewer of them than the SDK knows; it must advertise at least one query mode and nothing the SDK does not know.
+The SDK supports only `schema_version="v6"`. `validate_service_metadata()` checks `/healthz` metadata and raises typed compatibility errors before prediction if the service advertises a different schema, an unexpected model version, mode capabilities outside the recorded service contract, or an unsupported `decoding_strategy`. Return modes and time-index modes must match the SDK's lists exactly. Query modes and condition kinds are derived by the service from the mounted head, so a deployment may advertise fewer of them than the SDK knows; it must advertise at least one query mode and nothing the SDK does not know.
 
 Callers should pass an expected `model_version` when they already know which deployment artifact they intend to use. A mismatch is treated as a hard compatibility error rather than silently downgrading, guessing, or retrying another model.
 
@@ -289,7 +289,7 @@ Create `.env` from `.env.sample` or set the same values in your shell. A hosted 
 ```dotenv
 DATAROBOT_ENDPOINT=https://app.datarobot.com/api/v2
 DATAROBOT_API_TOKEN=<token>
-JOINTFM_SCHEMA_VERSION=v5
+JOINTFM_SCHEMA_VERSION=v6
 JOINTFM_DEPLOYMENT_ID=<deployment-id>
 # Or: JOINTFM_DEPLOYMENT_IDS=<deployment-id-1>,<deployment-id-2>
 # Optional drift-detection pin; the SDK discovers the model version from /healthz when unset:

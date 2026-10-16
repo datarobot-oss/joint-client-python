@@ -26,14 +26,14 @@ import leak_guard
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 # Samples are assembled at runtime so this file's own source never matches a rule.
-OBJECT_ID = "6a0" + "23f4f844e91557a9fc1f3"
+OBJECT_ID = "0123456789ab" + "cdef01234567"
 HEADER = "proprietary and " + "confidential to the owner"
 SAMPLES = {
     "proprietary-header": HEADER,
     "datarobot-object-id": f"deployment {OBJECT_ID}",
     "internal-host": "gpu-7.cluster" + ".internal",
     "private-ip-address": "10.2" + ".3.4",
-    "datarobot-host": "shell" + ".datarobot.com",
+    "datarobot-host": "tenant-example" + ".datarobot.com",
     "private-repository-link": "github.com/datarobot/" + "secret-repo",
     "planning-label": "Phase" + " 3g",
     "credential": "AKIA" + "ABCDEFGHIJKLMNOP",

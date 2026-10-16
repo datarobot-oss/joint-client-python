@@ -1,6 +1,6 @@
 {
   "status": "ok",
-  "schema_version": "v5",
+  "schema_version": "v6",
   "image_version": "0.3.0",
   "model_version": "jointfm-inference:0.3.0+ckpt.sdk-test",
   "checkpoint_version": "sdk-test",
@@ -21,7 +21,6 @@
   "max_sample_count": 4096,
   "max_concurrent_requests": 1,
   "data_generation": {
-    "sampler_type": "studentt",
     "min_series": 1,
     "max_series": 16,
     "t_input": 10.0,

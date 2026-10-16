@@ -45,7 +45,7 @@ _SAMPLE_COUNT = 4
 def _payload(return_mode: str, outputs: dict[str, Any], query_times: Any) -> dict:
     """One forecast response over three horizons and two requested columns."""
     return {
-        "schema_version": "v5",
+        "schema_version": "v6",
         "image_version": "0.3.0",
         "model_version": "jointfm-inference:0.3.0+ckpt.smoke-1",
         "checkpoint_version": "smoke-1",
@@ -301,7 +301,7 @@ class _NullDrawingTransport:
 
 _HEALTH_PAYLOAD: dict[str, Any] = {
     "status": "ok",
-    "schema_version": "v5",
+    "schema_version": "v6",
     "image_version": "0.3.0",
     "model_version": "jointfm-inference:0.3.0+ckpt.smoke-1",
     "checkpoint_version": "smoke-1",
