@@ -34,7 +34,6 @@ from jointfm_client import (
 def _capabilities(**overrides: Any) -> DataGenerationCapabilities:
     """Build a permissive capabilities object that tests override per case."""
     defaults: dict[str, Any] = {
-        "sampler_type": "studentt",
         "min_series": 1,
         "max_series": 16,
         "t_input": 10.0,
@@ -124,7 +123,6 @@ def test_plan_forecast_columns_spends_one_budget_across_both_roles(
     health = _health(
         json_fixture_loader,
         data_generation={
-            "sampler_type": "studentt",
             "min_series": 1,
             "max_series": 5,
             "t_input": 10.0,
@@ -159,7 +157,6 @@ def test_plan_forecast_columns_raises_when_combined_width_exceeds_max_series(
     health = _health(
         json_fixture_loader,
         data_generation={
-            "sampler_type": "studentt",
             "min_series": 1,
             "max_series": 3,
             "t_input": 10.0,
@@ -253,7 +250,6 @@ def test_plan_forecast_columns_enforces_min_series(
     health = _health(
         json_fixture_loader,
         data_generation={
-            "sampler_type": "studentt",
             "min_series": 4,
             "max_series": 12,
             "t_input": 10.0,

@@ -100,7 +100,7 @@ def _health(
     """Build one advertisement without going through a transport."""
     return HealthMetadata(
         status="ok",
-        schema_version="v5",
+        schema_version="v6",
         image_version="0.3.0",
         model_version=_MODEL_VERSION,
         checkpoint_version="sdk-test",
@@ -516,7 +516,7 @@ class _ConditionTransport:
         assert isinstance(sample_count, int)
         start = sum(cast(int, earlier["n_samples"]) for earlier in self.payloads[:-1])
         return {
-            "schema_version": "v5",
+            "schema_version": "v6",
             "image_version": "0.3.0",
             "model_version": _MODEL_VERSION,
             "checkpoint_version": "sdk-test",
@@ -556,7 +556,7 @@ def _health_payload(
     """Build one health advertisement as the service serializes it."""
     return {
         "status": "ok",
-        "schema_version": "v5",
+        "schema_version": "v6",
         "image_version": "0.3.0",
         "model_version": _MODEL_VERSION,
         "checkpoint_version": "sdk-test",

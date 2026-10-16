@@ -38,7 +38,6 @@ from jointfm_client.configuration import DEFAULT_RETRY_STATUS_CODES
 
 _MODEL_VERSION = "jointfm-inference:0.3.0+ckpt.sdk-test"
 _DATA_GENERATION = {
-    "sampler_type": "studentt",
     "min_series": 1,
     "max_series": 3,
     "t_input": 10.0,
@@ -69,7 +68,7 @@ def _settings(*deployment_ids: str) -> JointFMSettings:
         deployment_selector=(
             "deployment_id" if len(deployment_ids) == 1 else "deployment_ids"
         ),
-        schema_version="v5",
+        schema_version="v6",
         instances=tuple(
             JointFMInstanceSettings(
                 instance_id=deployment_id, predict_url=_url(deployment_id)
@@ -92,7 +91,7 @@ def _health_payload(
     """Health payload advertising a small capacity envelope."""
     payload: dict[str, Any] = {
         "status": "ok",
-        "schema_version": "v5",
+        "schema_version": "v6",
         "image_version": "0.3.0",
         "model_version": _MODEL_VERSION,
         "checkpoint_version": "sdk-test",
@@ -175,7 +174,7 @@ class _EnvelopeTransport:
             for sample in range(cast(int, payload["n_samples"]))
         ]
         return {
-            "schema_version": "v5",
+            "schema_version": "v6",
             "image_version": "0.3.0",
             "model_version": _MODEL_VERSION,
             "checkpoint_version": "sdk-test",

@@ -39,7 +39,7 @@ FIRST_SUPPORTED_PYTHON_VERSION: Final = "3.11"
 # pyproject.toml the way a hand-maintained literal here did.
 PACKAGE_VERSION: Final = importlib.metadata.version(DISTRIBUTION_NAME)
 
-SCHEMA_VERSION: Final = "v5"
+SCHEMA_VERSION: Final = "v6"
 # The service sums and averages its log densities in the model's own precision,
 # so its summaries differ from a recomputation in the last few digits.
 DERIVED_SCORE_TOLERANCE: Final = 1e-6
@@ -759,9 +759,10 @@ class DataGenerationCapabilities:
     is admissible on width alone. ``n_input`` is the longest history and
     ``n_output`` the longest forecast horizon the deployment was trained to
     handle; both are upper bounds, and smaller requests are accepted.
+    ``t_input`` and ``t_output`` are the simulated time spans of that history
+    and horizon during training, which give the time scale the model expects.
     """
 
-    sampler_type: str
     min_series: int
     max_series: int
     t_input: float
@@ -790,10 +791,6 @@ class DataGenerationCapabilities:
                 f"data_generation.max_series; got {min_series} > {max_series}"
             )
         return cls(
-            sampler_type=_require_string(
-                payload.get("sampler_type"),
-                field="data_generation.sampler_type",
-            ),
             min_series=min_series,
             max_series=max_series,
             t_input=_require_positive_float(

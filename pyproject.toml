@@ -84,6 +84,9 @@ include = [
     "/src/jointfm_client",
 ]
 
+[tool.pytest.ini_options]
+pythonpath = ["scripts"]
+
 [tool.ruff]
 extend-exclude = ["private"]
 
@@ -118,6 +121,7 @@ convention = "google"
 
 [tool.ty]
 environment.python-version = "3.11"
+environment.extra-paths = ["scripts"]
 
 [tool.ty.src]
 exclude = ["build/", "dist/", "private/"]

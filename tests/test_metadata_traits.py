@@ -36,7 +36,7 @@ def _health(traits: list[str] | None) -> dict[str, Any]:
     """Health payload that advertises ``traits``, or omits the field for ``None``."""
     payload: dict[str, Any] = {
         "status": "ok",
-        "schema_version": "v5",
+        "schema_version": "v6",
         "image_version": "0.3.0",
         "model_version": _MODEL_VERSION,
         "checkpoint_version": "smoke-1",
@@ -65,7 +65,7 @@ def _health(traits: list[str] | None) -> dict[str, Any]:
 def _mean_response(request: Mapping[str, Any]) -> dict[str, Any]:
     """Mean response that answers ``request`` with zeros."""
     return {
-        "schema_version": "v5",
+        "schema_version": "v6",
         "image_version": "0.3.0",
         "model_version": _MODEL_VERSION,
         "checkpoint_version": "smoke-1",

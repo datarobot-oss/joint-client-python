@@ -25,6 +25,17 @@ repos:
         entry: uv run cz check --commit-msg-file
         language: system
         stages: [commit-msg]
+      - id: leak-guard-message
+        name: leak guard (commit message)
+        entry: uv run python scripts/leak_guard.py message
+        language: system
+        stages: [commit-msg]
+      - id: leak-guard
+        name: leak guard (working tree)
+        entry: task leak-guard
+        language: system
+        pass_filenames: false
+        always_run: true
       - id: ruff-check
         name: ruff check
         entry: uv run ruff check .
