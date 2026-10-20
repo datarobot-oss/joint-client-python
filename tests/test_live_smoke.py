@@ -39,7 +39,7 @@ _REQUIRED_LIVE_ENV_NAMES = (
 
 
 def test_live_datarobot_health_smoke() -> None:
-    """Live datarobot health smoke."""
+    """Live DataRobot health smoke."""
     dotenv_path = Path(".env")
     dotenv_values_map = _dotenv_strings(dotenv_path)
     merged_env = dict(dotenv_values_map)
