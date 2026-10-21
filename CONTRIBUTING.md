@@ -19,8 +19,7 @@ external users — please read this guide before opening a pull request.
   with a minimal reproduction, the SDK version (`uv run python -c "import
   jointfm_client; print(jointfm_client.__version__)"`), and the Python version.
 - **Security issues:** do not open a public issue. Follow the disclosure
-  process in [SECURITY.md](SECURITY.md) (if present) or email the DataRobot
-  security team directly.
+  process in [SECURITY.md](SECURITY.md).
 
 ## Local Setup
 
@@ -105,9 +104,8 @@ start with an underscore are implementation details.
 
 Releases are cut by maintainers using Commitizen. See the **Cutting a release**
 section of [README.md](README.md). Do not hand-edit the `version =` line in
-`pyproject.toml`, `__version__` in `src/jointfm_client/__init__.py`, or the
-"Current SDK package version" line in `README.md` — those are owned by
-`cz bump`.
+`pyproject.toml` or the "Current SDK package version" line in `README.md` —
+those are owned by `cz bump`.
 
 ## Git Safety
 

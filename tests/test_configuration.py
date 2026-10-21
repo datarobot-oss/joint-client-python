@@ -23,6 +23,7 @@ from typing import Any
 import pytest
 import requests
 import yaml
+from dotenv import dotenv_values
 
 import jointfm_client.client as client_module
 from jointfm_client import (
@@ -31,6 +32,7 @@ from jointfm_client import (
     JOINTFM_DEPLOYMENT_ID_ENV,
     JOINTFM_MODEL_VERSION_ENV,
     JOINTFM_SCHEMA_VERSION_ENV,
+    SCHEMA_VERSION,
     JointFMClient,
     JointFMConfig,
     JointFMConfigurationError,
@@ -93,6 +95,14 @@ def test_checked_in_yaml_sample_matches_configuration_defaults() -> None:
         load_configuration(config_path=config_path).model_dump(mode="json")
         == expected_defaults
     )
+
+
+def test_checked_in_env_sample_pins_the_supported_schema_version() -> None:
+    """Checked in env sample pins the supported schema version."""
+    repo_root = Path(__file__).parents[1]
+    sample = dotenv_values(repo_root / ".env.sample")
+
+    assert sample[JOINTFM_SCHEMA_VERSION_ENV] == SCHEMA_VERSION
 
 
 def test_load_configuration_layers_yaml_over_defaults(tmp_path: Path) -> None:

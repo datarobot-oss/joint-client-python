@@ -49,7 +49,7 @@ class _SurfaceHandlerBase(BaseHTTPRequestHandler):
 def test_hosted_surface_uses_datarobot_routes_and_auth_headers(
     json_fixture_loader: Callable[[str], dict[str, Any]],
 ) -> None:
-    """Hosted surface uses datarobot routes and auth headers."""
+    """Hosted surface uses DataRobot routes and auth headers."""
     request_payload = json_fixture_loader("forecast_mean_request")
     health_payload = json_fixture_loader("health_metadata")
     response_payload = json_fixture_loader("forecast_mean_response")

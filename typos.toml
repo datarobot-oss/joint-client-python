@@ -1,8 +1,3 @@
-# `docs/LANGUAGE.md` remains the source of truth for separator-based house
-# style rules that typos cannot encode mechanically, like `pre-training` vs
-# `pretraining`. Typos still runs across the full repository to catch repo-wide
-# terminology and locale changes.
-
 [files]
 extend-exclude = [
     ".env",
@@ -12,11 +7,6 @@ extend-exclude = [
     "__pycache__",
     "config.yaml",
     "private",
-    "docs/latex/paper/references.bib",
-    "logs",
-    "results",
-    "runs",
-    "wandb",
     "**/.mypy_cache",
     "**/.ruff_cache",
     "**/node_modules",

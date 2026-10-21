@@ -487,7 +487,7 @@ def test_url_validators_reject_ambiguous_or_malformed_values() -> None:
 
 
 def test_datarobot_prediction_headers_use_notebook_authorization_scheme() -> None:
-    """Datarobot prediction headers use notebook authorization scheme."""
+    """DataRobot prediction headers use notebook authorization scheme."""
     assert build_datarobot_prediction_headers("secret-token") == {
         "Authorization": "Bearer secret-token",
         "Accept": "*/*",
