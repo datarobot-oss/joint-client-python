@@ -19,7 +19,7 @@ jobs:
         timeout-minutes: 30
         steps:
             - name: Checkout
-              uses: actions/checkout@v4
+              uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
               with:
                   fetch-depth: 0
 
@@ -29,13 +29,13 @@ jobs:
                   git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
             - name: Install Task
-              uses: arduino/setup-task@v2
+              uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
               with:
                   version: 3.x
                   repo-token: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Install uv with cache
-              uses: astral-sh/setup-uv@v6
+              uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
               with:
                   version: "0.10.12"
                   python-version: "3.13.3"
@@ -45,7 +45,7 @@ jobs:
                       pyproject.toml
 
             - name: Cache pre-commit environments
-              uses: actions/cache@v4
+              uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
               with:
                   path: ~/.cache/pre-commit
                   key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
@@ -53,7 +53,7 @@ jobs:
                       pre-commit-${{ runner.os }}-
 
             - name: Install typos CLI
-              uses: taiki-e/install-action@v2
+              uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
               with:
                   tool: typos-cli@1.45.1
 
@@ -72,18 +72,18 @@ jobs:
         timeout-minutes: 10
         steps:
             - name: Checkout with full history
-              uses: actions/checkout@v4
+              uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
               with:
                   fetch-depth: 0
 
             - name: Install Task
-              uses: arduino/setup-task@v2
+              uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
               with:
                   version: 3.x
                   repo-token: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Install uv with cache
-              uses: astral-sh/setup-uv@v6
+              uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
               with:
                   version: "0.10.12"
                   python-version: "3.13.3"
@@ -92,8 +92,6 @@ jobs:
                       uv.lock
                       pyproject.toml
 
-            # History published before the leak guard existed cannot be cleaned,
-            # so CI scans only the commits this pull request or push adds.
             - name: Scan the commits this pull request or push adds
               env:
                   REVISIONS: ${{ github.event_name == 'pull_request' && format('origin/{0}..HEAD', github.base_ref) || format('{0}..{1}', github.event.before, github.sha) }}
