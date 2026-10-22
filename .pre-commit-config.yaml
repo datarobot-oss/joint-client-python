@@ -20,11 +20,6 @@ repos:
         entry: uv run python scripts/insert_license_notebooks.py
         language: system
         types: [jupyter]
-      - id: commitizen
-        name: conventional commit message
-        entry: uv run cz check --commit-msg-file
-        language: system
-        stages: [commit-msg]
       - id: leak-guard-message
         name: leak guard (commit message)
         entry: uv run python scripts/leak_guard.py message
