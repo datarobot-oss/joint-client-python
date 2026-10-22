@@ -18,6 +18,10 @@ updates:
       directory: /
       schedule:
           interval: weekly
+      # Must be at least the uv exclude-newer window in pyproject.toml, or
+      # Dependabot targets releases that uv refuses to lock.
+      cooldown:
+          default-days: 14
       # Bundle every version bump for this ecosystem into one PR.
       groups:
           uv:
