@@ -1,8 +1,131 @@
-# JointFM Python SDK
+<p align="center">
+  <a href="https://github.com/datarobot/joint-client-python">
+    <img src="https://raw.githubusercontent.com/datarobot/joint-client-python/main/.github/datarobot_logo.avif" width="600px" alt="DataRobot Logo"/>
+  </a>
+</p>
+<h3 align="center">JointFM Python Client</h3>
 
-`jointfm-client` is the Python SDK package for callers of the JointFM REST API. The import namespace is `jointfm_client`, and the first supported Python version is Python 3.11.
+<p align="center">
+  <a href="https://www.datarobot.com/">Homepage</a>
+  ·
+  <a href="https://pypi.org/project/jointfm-client/">PyPI</a>
+  ·
+  <a href="https://github.com/datarobot/joint-client-python/blob/main/docs/api-reference.md">API reference</a>
+  ·
+  <a href="https://docs.datarobot.com/en/docs/get-started/troubleshooting/general-help.html">Support</a>
+</p>
 
-The SDK targets the DataRobot-hosted unstructured prediction route and the same direct local service contract used by the JointFM inference container. Public code for the contract lives in `jointfm_client.contract`; the README mirrors it for package users.
+<p align="center">
+  <a href="https://github.com/datarobot/joint-client-python/actions/workflows/ci.yml">
+    <img src="https://github.com/datarobot/joint-client-python/actions/workflows/ci.yml/badge.svg" alt="CI">
+  </a>
+  <a href="https://pypi.org/project/jointfm-client/">
+    <img src="https://img.shields.io/pypi/v/jointfm-client" alt="PyPI version">
+  </a>
+  <a href="https://pypi.org/project/jointfm-client/">
+    <img src="https://img.shields.io/pypi/pyversions/jointfm-client" alt="Python versions">
+  </a>
+  <a href="https://github.com/datarobot/joint-client-python/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/datarobot/joint-client-python" alt="License">
+  </a>
+</p>
+
+`jointfm-client` is the Python client for JointFM, DataRobot's forecasting foundation model. Given a running JointFM service, it builds and validates forecast requests, checks that the service speaks the same contract, and returns forecasts as NumPy arrays or pandas frames. It also installs a `jointfm-client` command for health checks and CSV forecasts.
+
+> **Status: alpha.** The API and the service contract can still change. While the version is `0.x`, a breaking change ships as a minor version bump, so pin a single minor series (`jointfm-client~=0.N.0`) if you need stability.
+
+## Before You Start: A JointFM Service
+
+This package is only the client. It contains no model and no weights: every call goes to a running JointFM service, so you need one before the first forecast works. The client connects to either kind:
+
+- **A service you run yourself**, on your own machine or GPU host. Point the client at its base URL with `JOINTFM_LOCAL_BASE_URL`. No DataRobot account is needed.
+- **A JointFM deployment hosted on DataRobot.** Point the client at it with `DATAROBOT_ENDPOINT`, `DATAROBOT_API_TOKEN`, and `JOINTFM_DEPLOYMENT_ID`.
+
+Running the server, deploying it, and obtaining model weights are covered by the JointFM inference server project, which is not public yet. This README will link to it once it is published.
+
+## Quick Start
+
+### Install
+
+Python 3.11 or newer is required.
+
+```bash
+pip install jointfm-client
+# or, in a uv project:
+uv add jointfm-client
+```
+
+The pandas helpers and the example notebooks need the optional extra: `pip install "jointfm-client[notebooks]"`.
+
+Verify the install:
+
+```bash
+python -c "import jointfm_client; print(jointfm_client.__version__)"
+```
+
+### Configure A Service
+
+Create a `.env` file in your working directory, or set the same values in your shell. [.env.sample](.env.sample) documents every option. For a service you run yourself:
+
+```dotenv
+JOINTFM_LOCAL_BASE_URL=http://127.0.0.1:8080
+JOINTFM_SCHEMA_VERSION=v6
+```
+
+For a deployment hosted on DataRobot:
+
+```dotenv
+DATAROBOT_ENDPOINT=https://app.datarobot.com/api/v2
+DATAROBOT_API_TOKEN=<token>
+JOINTFM_SCHEMA_VERSION=v6
+JOINTFM_DEPLOYMENT_ID=<deployment-id>
+# Or: JOINTFM_DEPLOYMENT_IDS=<deployment-id-1>,<deployment-id-2>
+# Optional drift-detection pin; the SDK discovers the model version from /healthz when unset:
+# JOINTFM_MODEL_VERSION=jointfm-inference:<image-version>+ckpt.<checkpoint-version>
+```
+
+Check that the client can reach the service and that its metadata matches the configured schema and model pins:
+
+```bash
+jointfm-client health
+```
+
+### Run The First Forecast
+
+This minimal example uses row dictionaries plus explicit column metadata, so it does not require pandas:
+
+```python
+from jointfm_client import (
+	ColumnSpec,
+	DataFrameSchema,
+	JointFMClient,
+	build_ordinal_query_times,
+)
+
+history_rows = [
+	{"t": 0, "sales": 10.0},
+	{"t": 1, "sales": 12.0},
+	{"t": 2, "sales": 13.5},
+	{"t": 3, "sales": 15.0},
+]
+schema = DataFrameSchema(
+	columns=(ColumnSpec(name="sales", modality="numeric", role="target"),),
+	time_index_mode="ordinal",
+	time_column="t",
+)
+
+client = JointFMClient.from_env()
+result = client.forecast_mean(
+	history_rows,
+	schema=schema,
+	query_times=build_ordinal_query_times([row["t"] for row in history_rows], periods=3),
+	requested_columns=("sales",),
+)
+
+print(result.to_pandas_tidy())
+```
+
+Use `forecast_samples(...)` for sampled trajectories or `forecast_quantiles(...)` with `quantiles=(0.1, 0.5, 0.9)` for quantile surfaces. For pandas inputs, install the optional extra and pass a `DataFrame` to `forecast(...)` with `target_columns` and `requested_columns` set explicitly.
 
 ## Package Contract
 
@@ -130,7 +253,7 @@ The package installs a `jointfm-client` command. It reads `.env` by default, acc
 Validate credentials, resolve the deployment, probe health, and print non-secret service metadata plus per-instance availability and sample topology:
 
 ```bash
-uv run jointfm-client health
+jointfm-client health
 ```
 
 The health command includes consensus `service` metadata, an `instances` list (available/unavailable, per-instance sample cap and request concurrency, errors), `topology` (for example `1x7000, 1x3000`), overall `max_sample_count` (sum of reachable caps), and non-secret `deployment` settings when configured.
@@ -138,13 +261,13 @@ The health command includes consensus `service` metadata, an `instances` list (a
 Submit one low-level JSON request file and write the JSON response file:
 
 ```bash
-uv run jointfm-client predict request.json response.json
+jointfm-client predict request.json response.json
 ```
 
 Forecast from CSV history and write tidy forecast rows as CSV:
 
 ```bash
-uv run jointfm-client forecast-csv history.csv forecast.csv \
+jointfm-client forecast-csv history.csv forecast.csv \
 	--query-times 2,3,4 \
 	--target-column target \
 	--return-mode mean
@@ -155,10 +278,10 @@ uv run jointfm-client forecast-csv history.csv forecast.csv \
 Check that the deployment serves the largest request its health envelope advertises:
 
 ```bash
-uv run jointfm-client max-utilization
+jointfm-client max-utilization
 ```
 
-`max-utilization` fills every request slot at once with a seeded synthetic sample forecast of `max_series` target columns, an `n_input`-row history, an `n_output`-step horizon, and `max_sample_count` samples: each reachable endpoint (every pool instance with `JOINTFM_DEPLOYMENT_IDS` or `JOINTFM_LOCAL_BASE_URLS`) receives as many simultaneous maximal requests as its `max_concurrent_requests` admits. It prints the burst's wall-clock time and a final `VERDICT: PASS` or `VERDICT: FAIL` line. It exits with status 1 on FAIL: when a request raises a service or transport error or returns the wrong sample count, or when an endpoint fails the health probe. Retries are disabled for this command, so a request that fails under load is reported instead of retried. Each run uses real GPU time on the deployment. `task max-utilization` runs the same command, and `notebooks/max_utilization.ipynb` shows the burst timing as a table.
+`max-utilization` fills every request slot at once with a seeded synthetic sample forecast of `max_series` target columns, an `n_input`-row history, an `n_output`-step horizon, and `max_sample_count` samples: each reachable endpoint (every pool instance with `JOINTFM_DEPLOYMENT_IDS` or `JOINTFM_LOCAL_BASE_URLS`) receives as many simultaneous maximal requests as its `max_concurrent_requests` admits. It prints the burst's wall-clock time and a final `VERDICT: PASS` or `VERDICT: FAIL` line. It exits with status 1 on FAIL: when a request raises a service or transport error or returns the wrong sample count, or when an endpoint fails the health probe. Retries are disabled for this command, so a request that fails under load is reported instead of retried. Each run uses real GPU time on the deployment. From a clone of this repository, `task max-utilization` runs the same command, and `notebooks/max_utilization.ipynb` shows the burst timing as a table.
 
 ## Notebook Workflows
 
@@ -170,7 +293,7 @@ from jointfm_client import bootstrap_notebook
 bootstrap_notebook(add_src_root=True)
 ```
 
-Run `task setup` first so VS Code can select the registered `Python (joint-client-python)` notebook kernel backed by this repository's `.venv`.
+The notebooks run from a clone of this repository. Run `task setup` there first (see [CONTRIBUTING.md](CONTRIBUTING.md#local-setup)) so VS Code can select the registered `Python (joint-client-python)` notebook kernel backed by the clone's `.venv`.
 
 The bootstrap helper resolves the nearest src-layout Python project root, switches the working directory there, and prepends that project's local `src` tree during development. The examples cover hosted health checks, a maximum-utilization check, low-level JSON prediction, mean forecasts, sample forecasts, quantile forecasts, conditional forecasts (one conditional read as a mean, as draws, as quantiles inside a bounded band, and as the log density of observed values, plus the ranking of candidate conditions), pandas/NumPy result conversion, and CSV forecast workflows. They use `.env.sample` placeholders and checked-in fixture payloads; no real tokens or deployment IDs are stored in notebooks.
 
@@ -253,242 +376,16 @@ Callers should pass an expected `model_version` when they already know which dep
 
 High-level forecast helpers build the same validated request payloads as `build_forecast_payload(...)` and return `ForecastResponse`. Row-list inputs require an explicit `DataFrameSchema` or `ColumnSpec` sequence, while pandas DataFrame inputs can use the DataFrame adapter inference options. `predict(payload)` remains the low-level JSON method and requires the payload to include `model_version`.
 
-## Quick Start
+## Support
 
-### Install `uv` and `task`
+- **Bugs and questions:** open an issue at [datarobot/joint-client-python](https://github.com/datarobot/joint-client-python/issues).
+- **Security issues:** do not open a public issue; follow [SECURITY.md](SECURITY.md).
+- **DataRobot platform help:** see [DataRobot support](https://docs.datarobot.com/en/docs/get-started/troubleshooting/general-help.html).
 
-Use the same curl-based bootstrap flow on Ubuntu, macOS, and AWS Linux:
+## Contributing
 
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-uv python install 3.13
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, the commit format, and how releases are cut.
 
-sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
-```
+## License
 
-Ensure `~/.local/bin` is on your `PATH` in new shells.
-
-### Set Up The Project
-
-```bash
-task setup
-```
-
-`task setup` creates or reuses `.venv` pinned to Python 3.13.3, synchronizes the project and development dependencies, installs the local Git pre-commit hooks, installs or verifies `typos`, and prints the shell activation hint for `.venv`.
-
-Verify the installed package import:
-
-```bash
-uv run python -c "import jointfm_client; print(jointfm_client.__version__)"
-```
-
-### Configure A Deployment
-
-Create `.env` from `.env.sample` or set the same values in your shell. A hosted forecast needs the DataRobot API v2 endpoint, token, schema pin, and exactly one deployment selector:
-
-```dotenv
-DATAROBOT_ENDPOINT=https://app.datarobot.com/api/v2
-DATAROBOT_API_TOKEN=<token>
-JOINTFM_SCHEMA_VERSION=v6
-JOINTFM_DEPLOYMENT_ID=<deployment-id>
-# Or: JOINTFM_DEPLOYMENT_IDS=<deployment-id-1>,<deployment-id-2>
-# Optional drift-detection pin; the SDK discovers the model version from /healthz when unset:
-# JOINTFM_MODEL_VERSION=jointfm-inference:<image-version>+ckpt.<checkpoint-version>
-```
-
-Check that the SDK can resolve the deployment and that the service metadata matches the configured schema and model pins:
-
-```bash
-uv run jointfm-client health
-```
-
-### Run The First Forecast
-
-This minimal example uses row dictionaries plus explicit column metadata, so it does not require pandas:
-
-```python
-from jointfm_client import (
-	ColumnSpec,
-	DataFrameSchema,
-	JointFMClient,
-	build_ordinal_query_times,
-)
-
-history_rows = [
-	{"t": 0, "sales": 10.0},
-	{"t": 1, "sales": 12.0},
-	{"t": 2, "sales": 13.5},
-	{"t": 3, "sales": 15.0},
-]
-schema = DataFrameSchema(
-	columns=(ColumnSpec(name="sales", modality="numeric", role="target"),),
-	time_index_mode="ordinal",
-	time_column="t",
-)
-
-client = JointFMClient.from_env()
-result = client.forecast_mean(
-	history_rows,
-	schema=schema,
-	query_times=build_ordinal_query_times([row["t"] for row in history_rows], periods=3),
-	requested_columns=("sales",),
-)
-
-print(result.to_pandas_tidy())
-```
-
-Use `forecast_samples(...)` for sampled trajectories or `forecast_quantiles(...)` with `quantiles=(0.1, 0.5, 0.9)` for quantile surfaces. For pandas inputs, install the optional dataframe extra and pass a `DataFrame` to `forecast(...)` with `target_columns` and `requested_columns` set explicitly.
-
-## Development Commands
-
-- `task lint`: run Ruff lint checks (read-only)
-- `task format`: run Ruff formatter (rewrites files in place)
-- `task license-check`: verify every Python source file has the required copyright/SPDX header
-- `task typecheck`: run `ty` static type checks
-- `task test`: run unit tests
-- `task max-utilization`: send the largest advertised forecast to the configured deployment and print a PASS/FAIL verdict with wall-clock times
-- `task coverage`: run tests with coverage enforcement above 90%
-- `task build`: build the source distribution and wheel, then validate artifact metadata and contents
-- `task check`: run the static code quality gate (typos, lint, format check, type checks)
-- `task release:dry`: preview the next SemVer bump without changing any files
-- `task release`: cut a SemVer release with Commitizen (writes `CHANGELOG.md`, bumps versions, creates tag)
-- `task release:publish`: push the release commit and its tag to `origin`, which triggers the PyPI publish workflow
-- `task pre-commit`: run every configured pre-commit hook
-- `task leak-guard`: fail when a file in the working tree carries private material in its path or content
-- `task leak-guard:history`: fail when a commit carries private material in its message, paths, or files; pass revisions to narrow the scan (`task leak-guard:history -- origin/main..HEAD`)
-
-Contributors do not need to add copyright or license headers manually. The `insert-license` pre-commit hook runs [skywalking-eyes](https://github.com/apache/skywalking-eyes) (via the `apache/skywalking-eyes` Docker image, so a running Docker daemon is required) to stamp the standard Apache-2.0 header (`Copyright 2026 DataRobot, Inc. and its affiliates.` followed by the standard "Licensed under the Apache License, Version 2.0" notice) into every `.py` file, and the companion `insert-license-notebooks` hook stamps the same notice into a leading markdown cell of every notebook the first time you run `task pre-commit`. Verify the headers are present at any time with `task license-check`.
-
-Your user must belong to the `docker` group so the hook can reach the daemon:
-
-```shell
-sudo usermod -aG docker "$USER"
-```
-
-Group membership is captured when a process starts, so it must be in effect **before** the editor or its language server launches — start a fresh login session (or reboot) after adding yourself to the group, otherwise the commit hook inherits the old groups and fails with a Docker permission error.
-
-### Leak guard
-
-This repository is public, so `scripts/leak_guard.py` fails on material that must stay private: proprietary file headers, DataRobot object IDs, internal hosts and private addresses, links to non-public repositories, planning labels, and credential shapes. It runs as a pre-commit hook over the working tree, as a `commit-msg` hook over each message, and in CI over every commit a pull request or push adds. Commits published before the guard existed cannot be cleaned, so CI does not scan the full history.
-
-Some rules cannot be published because they name what they guard. Maintainers keep those in a git-ignored `.leak-patterns.private` at the repository root: one Python regular expression per line, blank lines and `#` comment lines skipped. The guard reports whether it loaded the file and runs the public rules alone when it is absent, as in CI. A dangling link fails. A passing guard does not prove a change safe to publish.
-
-## Versioning & Commits
-
-The package follows strict [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Releases are cut with [Commitizen](https://commitizen-tools.github.io/commitizen/), driven by [Conventional Commits](https://www.conventionalcommits.org/), so the commit log is the source of truth for what a release contains.
-
-### Commit message format
-
-Every commit subject must follow:
-
-```text
-<type>(<optional scope>): <imperative summary>
-```
-
-Examples:
-
-```text
-feat(adapters): add quantile forecast helper
-fix(transport): retry on idempotent 5xx responses
-perf(adapters): cache schema validation across forecast batches
-refactor(configuration): split URL resolution into helpers
-docs(readme): document the release workflow
-test(transport): cover retry on 502/503/504
-build(deps): bump pydantic to 2.13.4
-ci(pre-commit): pin commitizen to v3.31
-chore(repo): move fixtures to tests/fixtures/v1
-```
-
-#### Commit types
-
-The full set of accepted types comes from the `cz_conventional_commits` rule set referenced above. Pick the type that matches the **primary intent** of the commit; split commits that mix concerns. Only `feat`, `fix`, `refactor`, and `perf` (plus breaking-change markers) drive a SemVer bump — every other type is recorded in `git log` but does not, on its own, cause `cz bump` to cut a new version.
-
-| Type | When to use | SemVer bump |
-| --- | --- | --- |
-| `feat` | A user-visible feature: new public API, new CLI flag, new helper exposed to callers. | **minor** |
-| `fix` | A bug fix in shipped behavior — the symptom is observable to callers or operators. | **patch** |
-| `perf` | A change that improves performance without changing observable behavior. | **patch** |
-| `refactor` | An internal restructure that neither adds a feature nor fixes a bug (renames, moves, extractions, internal type changes). | **patch** |
-| `docs` | Documentation-only changes (READMEs, prose, docstrings, comments, example payloads, API reference). | none |
-| `test` | Adding, fixing, or restructuring tests, fixtures, or test helpers with no production-code change. | none |
-| `build` | Build system, packaging, or dependency-pinning changes (`pyproject.toml`, lockfile, wheel build hooks). | none |
-| `ci` | CI configuration changes (GitHub Actions workflows, `.pre-commit-config.yaml`, release hooks). | none |
-| `chore` | Repository maintenance not covered above (tooling tweaks, repo-level renames, housekeeping, fixture moves). | none |
-| `style` | Pure formatting or whitespace, no behavior change — rare here because Ruff format runs in pre-commit. | none |
-| `revert` | Reverts a previous commit; the body should include `Refs: <sha>`. Re-add `!` or a `BREAKING CHANGE:` footer if the reverted commit was a breaking change. | none |
-| any type with `!` or a `BREAKING CHANGE:` footer | A breaking change to public API, configuration schema, environment variables, or the service wire contract. | **major**¹ |
-
-¹ This project sets `major_version_zero = true` in `pyproject.toml`, so breaking changes are downgraded to a **minor** bump while the SDK is on `0.x`. They will become major bumps once the SDK ships `1.0.0`.
-
-A release window that contains only `none`-bump commits is not releasable on its own: `cz bump` exits without writing a new version. Either land a `feat`/`fix`/`refactor`/`perf` first, or force the bump explicitly with `task release -- --increment PATCH`.
-
-#### Breaking changes
-
-Declare a breaking change with `!` after the type, e.g. `feat(adapters)!: rename forecast() to predict()`, or — preferred when the change needs explanation — with an explicit footer:
-
-```text
-feat(adapters): rename forecast() to predict()
-
-BREAKING CHANGE: forecast() is gone; callers must use predict().
-```
-
-The `commit-msg` pre-commit hook runs `cz check` and rejects malformed messages locally before the commit is created.
-
-### First-time tag seed (one-off)
-
-Commitizen bumps **from** the tag matching the current `version =` in `pyproject.toml`. A brand-new repo has no such tag, so the first `task release` or `task release:dry` will fail with a clear message. Seed it once:
-
-```bash
-git tag -a v0.0.1 -m 'Seed initial release tag for Commitizen'
-git push --tags
-```
-
-After that, every future `task release` finds its base tag automatically.
-
-### Cutting a release
-
-```bash
-task release:dry      # preview the next version + CHANGELOG entries
-task release          # bump, write CHANGELOG.md, create the annotated tag
-task release:publish  # push the bump commit and the tag
-```
-
-`task release` first runs `task release:check` (clean tree, on `main`, in sync with `origin/main`), then calls `cz bump` which:
-
-- reads commits since the last `v*` tag,
-- picks the SemVer bump from the types it sees,
-- updates `CHANGELOG.md`,
-- bumps `version =` in `pyproject.toml` and the "Current SDK package version" line in this README,
-- commits the bump and creates the annotated tag.
-
-Publishing is a separate task on purpose, so you can inspect the inferred bump before anything leaves your machine — Commitizen derives the version from commit messages, and a stray `feat:` where you meant `fix:` is only fixable while the release is still local. Override the inferred bump level when needed: `task release -- --increment minor`.
-
-`task release:publish` re-checks that the working tree is clean, that you are on `main`, that the tag points at `HEAD`, and that `origin` does not already have the tag, prints the commits about to be pushed, asks for confirmation on a terminal, and then pushes `main` and that single tag. It pushes one explicit tag rather than `git push --tags`, so unrelated local tags are never published.
-
-Pushing the `v*` tag triggers the [`Publish to PyPI`](.github/workflows/publish.yml) workflow, which rebuilds and validates the distribution with `task build` and uploads it to PyPI via [`pypa/gh-action-pypi-publish`](https://github.com/pypa/gh-action-pypi-publish) — keeping the git tag, the wheel filename, `jointfm_client.__version__`, and the PyPI version all in lockstep.
-
-The workflow authenticates with PyPI through [trusted publishing](https://docs.pypi.org/trusted-publishers/) (OIDC), so no API-token secret is stored in the repository. Before the first release, configure it once on PyPI:
-
-- register a [pending trusted publisher](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/) for the `jointfm-client` project pointing at owner `datarobot`, repository `joint-client-python`, workflow `publish.yml`, and environment `pypi`;
-- create a GitHub Actions environment named `pypi` on the repository (optionally gated with required reviewers) so the publish job can run.
-
-After pulling these changes for the first time, run `uv run pre-commit install` (or `task setup`) once so the new `commit-msg` hook is registered with git.
-
-### Hand-editing the version (don't)
-
-The `version =` line in [`pyproject.toml`](pyproject.toml) and the "Current SDK package version" line in this README are **owned by `cz bump`** — treat them the way you'd treat a lockfile. Each release rewrites both of them atomically.
-
-Nothing in the package source carries a version literal: `jointfm_client.contract.PACKAGE_VERSION` reads the installed distribution metadata that the build backend generates from `[project].version`, and `jointfm_client.__version__` is that same value. They follow a bump automatically, so there is nothing to hand-edit and nothing that can drift.
-
-If you hand-edit them, the next `task release` will catch you:
-
-- if you bumped only some lines, `cz bump` aborts with "Configured files cannot be updated, check consistency";
-- if you bumped them all but never created the matching `vX.Y.Z` tag, `task release:require-tag` refuses to run and tells you to seed the tag.
-
-If you genuinely need to set a specific version outside the normal release flow (bootstrap, recovery from a botched state), use the escape hatch:
-
-```bash
-uv run cz bump --files-only X.Y.Z
-```
-
-That atomically rewrites every `version_files` line to `X.Y.Z` without committing or tagging. After it returns, commit and tag manually.
+Apache License 2.0. See [LICENSE](LICENSE).

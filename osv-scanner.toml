@@ -1,0 +1,29 @@
+# Advisories osv-scanner may ignore in uv.lock. Each entry must carry an
+# ignoreUntil date so a waiver lapses on its own and the scan fails again.
+# Use one only while the fixed release is younger than the uv exclude-newer
+# cooldown in pyproject.toml; bump the lock once the fix clears it.
+
+[[IgnoredVulns]]
+id = "GHSA-6q48-6c7w-9gw2"
+ignoreUntil = 2026-11-05T00:00:00Z
+reason = "certifi: fixed release is still inside the uv exclude-newer cooldown"
+
+[[IgnoredVulns]]
+id = "GHSA-43mp-35q3-x3fq"
+ignoreUntil = 2026-11-05T00:00:00Z
+reason = "virtualenv (dev only): fixed release is still inside the uv exclude-newer cooldown"
+
+[[IgnoredVulns]]
+id = "GHSA-c978-59m8-c77v"
+ignoreUntil = 2026-11-05T00:00:00Z
+reason = "virtualenv (dev only): fixed release is still inside the uv exclude-newer cooldown"
+
+[[IgnoredVulns]]
+id = "GHSA-cw65-gx24-rc82"
+ignoreUntil = 2026-11-05T00:00:00Z
+reason = "virtualenv (dev only): fixed release is still inside the uv exclude-newer cooldown"
+
+[[IgnoredVulns]]
+id = "GHSA-vxj4-q4g9-crj7"
+ignoreUntil = 2026-11-05T00:00:00Z
+reason = "virtualenv (dev only): fixed release is still inside the uv exclude-newer cooldown"
