@@ -159,3 +159,30 @@ def test_example_notebooks_start_with_bootstrap_cell() -> None:
         for cell in payload["cells"]:
             assert "language" in cell["metadata"]
             assert cell["metadata"]["id"]
+
+
+def test_service_notebooks_print_instance_ids() -> None:
+    """Every notebook that talks to a JointFM service prints its instance IDs.
+
+    An instance ID is the deployment ID of a hosted deployment or the base URL
+    of a local service, so a saved run names the service that produced it.
+    """
+    repo_root = Path(__file__).resolve().parents[1]
+    service_notebook_names = []
+    for notebook_path in sorted((repo_root / "notebooks").glob("*.ipynb")):
+        payload = json.loads(notebook_path.read_text(encoding="utf-8"))
+        source_lines = [
+            line
+            for cell in payload["cells"]
+            if cell["cell_type"] == "code"
+            for line in "".join(cell["source"]).splitlines()
+        ]
+        if not any("JointFMClient.from_env(" in line for line in source_lines):
+            continue
+        service_notebook_names.append(notebook_path.name)
+        assert any(
+            "print(" in line and "instance_id" in line for line in source_lines
+        ), f"{notebook_path.name} never prints the JointFM instance IDs it uses"
+
+    assert "pandas_result_conversion.ipynb" not in service_notebook_names
+    assert "max_utilization.ipynb" in service_notebook_names
