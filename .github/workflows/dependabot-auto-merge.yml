@@ -1,0 +1,35 @@
+name: Dependabot auto-merge
+
+# Turns on GitHub's native auto-merge for Dependabot PRs. This workflow doesn't
+# merge anything itself: GitHub does, and only once the `main` rulesets are
+# satisfied (required checks green, required review approved). A red or
+# unreviewed PR just sits open like it always did.
+#
+# A merge made on behalf of GITHUB_TOKEN does not fire `push` workflows, so
+# nothing re-runs on main after these merges. The PR runs already covered the
+# merged code, and CodeQL's weekly schedule covers main.
+on: pull_request
+
+permissions: {}
+
+jobs:
+    automerge:
+        name: Enable auto-merge
+        # Keyed on the PR author rather than github.actor, which is whoever
+        # triggered this particular run and changes on a manual re-run.
+        if: github.event.pull_request.user.login == 'dependabot[bot]'
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        permissions:
+            # Dependabot-triggered runs get a read-only token unless the
+            # workflow asks for more. Merging needs both of these.
+            contents: write
+            pull-requests: write
+        steps:
+            # No checkout: nothing from the PR branch is executed with the
+            # write token, only the preinstalled gh CLI.
+            - name: Enable auto-merge
+              run: gh pr merge --auto --squash "$PR_URL"
+              env:
+                  PR_URL: ${{ github.event.pull_request.html_url }}
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
