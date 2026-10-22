@@ -103,7 +103,7 @@ The package follows strict [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ### Commit message format
 
-Every commit subject must follow:
+Squash merges use GitHub's default message, usually the pull request title, as the commit subject on `main`. For `cz bump` to see a change, that subject must follow:
 
 ```text
 <type>(<optional scope>): <imperative summary>
@@ -156,7 +156,7 @@ feat(adapters): rename forecast() to predict()
 BREAKING CHANGE: forecast() is gone; callers must use predict().
 ```
 
-The `commit-msg` pre-commit hook runs `cz check` and rejects malformed messages locally before the commit is created.
+Commits on a feature branch are discarded by the squash merge, so their messages are not checked against this format.
 
 ## Public API Surface
 

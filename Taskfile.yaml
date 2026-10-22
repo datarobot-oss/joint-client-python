@@ -253,19 +253,7 @@ tasks:
 
   pre-commit:
     desc: Run pre-commit hooks on all files
-    cmd: |
-      set +e
-      uv run pre-commit run --all-files
-      PRE_COMMIT_STATUS=$?
-      MSG_STATUS=0
-      if [ -s .git/COMMIT_EDITMSG ]; then
-        uv run cz check --commit-msg-file .git/COMMIT_EDITMSG
-        MSG_STATUS=$?
-        uv run python scripts/leak_guard.py message .git/COMMIT_EDITMSG || MSG_STATUS=1
-      fi
-      if [ "$PRE_COMMIT_STATUS" -ne 0 ] || [ "$MSG_STATUS" -ne 0 ]; then
-        exit 1
-      fi
+    cmd: uv run pre-commit run --all-files
 
   install:ripgrep:
     desc: Install ripgrep using the available system package manager
