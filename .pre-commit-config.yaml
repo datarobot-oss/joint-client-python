@@ -30,6 +30,13 @@ repos:
         entry: uv run python scripts/leak_guard.py message
         language: system
         stages: [commit-msg]
+      # Credential shapes; the leak guard below covers DataRobot-specific material.
+      - id: gitleaks
+        name: gitleaks (staged changes)
+        entry: task secret-scan:staged
+        language: system
+        pass_filenames: false
+        always_run: true
       - id: leak-guard
         name: leak guard (working tree)
         entry: task leak-guard

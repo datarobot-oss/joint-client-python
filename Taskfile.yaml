@@ -5,6 +5,9 @@ silent: true
 
 vars:
   TYPOS_VERSION: '{{.TYPOS_VERSION | default "1.45.1"}}'
+  # Scanner images: docker resolves the digest and ignores the tag, which is kept for readers.
+  GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+  OSV_SCANNER_IMAGE: ghcr.io/google/osv-scanner:v2.7.0@sha256:4f3b7e2c64b9d38a5febc5a7e4a3dfef1d1362f726dea7a2ef4762b46469fcd0
 
 tasks:
   default:
@@ -65,6 +68,36 @@ tasks:
         echo "OK: leak guard found no private material in the scanned history"
       else
         echo "FAIL: leak guard found private material in the scanned history"
+        exit 1
+      fi
+
+  secret-scan:
+    desc: Fail when gitleaks finds a credential in any commit of the git history (needs docker)
+    cmd: |
+      if docker run --rm -v "$PWD:/repo" {{.GITLEAKS_IMAGE}} git /repo --redact --no-banner; then
+        echo "OK: gitleaks found no credentials in the git history"
+      else
+        echo "FAIL: gitleaks found credentials in the git history"
+        exit 1
+      fi
+
+  secret-scan:staged:
+    desc: Fail when gitleaks finds a credential in the staged changes (needs docker)
+    cmd: |
+      if docker run --rm -v "$PWD:/repo" {{.GITLEAKS_IMAGE}} git /repo --pre-commit --staged --redact --no-banner; then
+        echo "OK: gitleaks found no credentials in the staged changes"
+      else
+        echo "FAIL: gitleaks found credentials in the staged changes"
+        exit 1
+      fi
+
+  vuln-scan:
+    desc: Fail when a package pinned in uv.lock has a known vulnerability (needs docker)
+    cmd: |
+      if docker run --rm -v "$PWD:/src" {{.OSV_SCANNER_IMAGE}} scan source --config /src/osv-scanner.toml --lockfile /src/uv.lock; then
+        echo "OK: osv-scanner found no known vulnerabilities in uv.lock"
+      else
+        echo "FAIL: osv-scanner found known vulnerabilities in uv.lock"
         exit 1
       fi
 
@@ -155,7 +188,7 @@ tasks:
         NEXT="$(uv run cz version --project)"
         echo
         echo "OK: released v$PREV -> v$NEXT"
-        echo "  bumped version in: pyproject.toml, src/jointfm_client/__init__.py, README.md"
+        echo "  bumped version in: pyproject.toml, README.md"
         echo "  updated: CHANGELOG.md, uv.lock"
         echo "  created tag: v$NEXT"
         echo "  publish with: task release:publish"
