@@ -20,6 +20,12 @@ repos:
         entry: uv run python scripts/insert_license_notebooks.py
         language: system
         types: [jupyter]
+      # Strip outputs before the scans so they judge the notebook as committed.
+      - id: nbstripout
+        name: nbstripout
+        entry: uv run nbstripout
+        language: system
+        types: [jupyter]
       - id: leak-guard-message
         name: leak guard (commit message)
         entry: uv run python scripts/leak_guard.py message

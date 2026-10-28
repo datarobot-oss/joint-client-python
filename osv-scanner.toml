@@ -24,6 +24,56 @@ ignoreUntil = 2026-11-05T00:00:00Z
 reason = "virtualenv (dev only): fixed release is still inside the uv exclude-newer cooldown"
 
 [[IgnoredVulns]]
-id = "GHSA-vxj4-q4g9-crj7"
+id = "GHSA-567q-5qvw-pf92"
+ignoreUntil = 2026-11-05T00:00:00Z
+reason = "filelock (dev only): fixed release is still inside the uv exclude-newer cooldown"
+
+[[IgnoredVulns]]
+id = "GHSA-9vhv-jxww-xfm5"
+ignoreUntil = 2026-11-05T00:00:00Z
+reason = "filelock (dev only): fixed release is still inside the uv exclude-newer cooldown"
+
+[[IgnoredVulns]]
+id = "GHSA-v4x8-3wr5-3wq8"
+ignoreUntil = 2026-11-05T00:00:00Z
+reason = "filelock (dev only): fixed release is still inside the uv exclude-newer cooldown"
+
+[[IgnoredVulns]]
+id = "GHSA-394h-qwmc-48pf"
+ignoreUntil = 2026-11-05T00:00:00Z
+reason = "virtualenv (dev only): fixed release is still inside the uv exclude-newer cooldown"
+
+[[IgnoredVulns]]
+id = "GHSA-494p-63j8-28p3"
+ignoreUntil = 2026-11-05T00:00:00Z
+reason = "virtualenv (dev only): fixed release is still inside the uv exclude-newer cooldown"
+
+[[IgnoredVulns]]
+id = "GHSA-558c-9hv2-4prj"
+ignoreUntil = 2026-11-05T00:00:00Z
+reason = "virtualenv (dev only): fixed release is still inside the uv exclude-newer cooldown"
+
+[[IgnoredVulns]]
+id = "GHSA-6w3r-xr62-4xcp"
+ignoreUntil = 2026-11-05T00:00:00Z
+reason = "virtualenv (dev only): fixed release is still inside the uv exclude-newer cooldown"
+
+[[IgnoredVulns]]
+id = "GHSA-cx28-75q4-x26q"
+ignoreUntil = 2026-11-05T00:00:00Z
+reason = "virtualenv (dev only): fixed release is still inside the uv exclude-newer cooldown"
+
+[[IgnoredVulns]]
+id = "GHSA-fc2g-4w5p-6whm"
+ignoreUntil = 2026-11-05T00:00:00Z
+reason = "virtualenv (dev only): fixed release is still inside the uv exclude-newer cooldown"
+
+[[IgnoredVulns]]
+id = "GHSA-hhxq-47xx-j5xx"
+ignoreUntil = 2026-11-05T00:00:00Z
+reason = "virtualenv (dev only): fixed release is still inside the uv exclude-newer cooldown"
+
+[[IgnoredVulns]]
+id = "GHSA-qmx5-4p3x-wvqf"
 ignoreUntil = 2026-11-05T00:00:00Z
 reason = "virtualenv (dev only): fixed release is still inside the uv exclude-newer cooldown"
