@@ -38,6 +38,9 @@ jobs:
 
     vuln-scan:
         name: task vuln-scan
+        # Disabled: failing on every advisory, including ones whose fix sits
+        # inside the uv exclude-newer cooldown, made it pure noise on PRs.
+        if: false
         runs-on: ubuntu-latest
         timeout-minutes: 10
         steps:

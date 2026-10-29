@@ -40,7 +40,7 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/datarobot/joint-client-python"
+Repository = "https://github.com/datarobot-oss/joint-client-python"
 
 [project.scripts]
 jointfm-client = "jointfm_client.cli:main"
