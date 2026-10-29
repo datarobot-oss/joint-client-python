@@ -144,7 +144,7 @@ The full set of accepted types comes from the `cz_conventional_commits` rule set
 
 ¹ This project sets `major_version_zero = true` in `pyproject.toml`, so breaking changes are downgraded to a **minor** bump while the SDK is on `0.x`. They will become major bumps once the SDK ships `1.0.0`.
 
-A release window that contains only `none`-bump commits is not releasable on its own: `cz bump` exits without writing a new version. Either land a `feat`/`fix`/`refactor`/`perf` first, or force the bump explicitly with `task release -- --increment PATCH`.
+A release window that contains only `none`-bump commits (for example dependency or CI updates) still releases: `task release` passes `--allow-no-commit` to `cz bump`, which then falls back to a **patch** bump. A window with no commits at all since the last tag is refused by `task release:check`, so an unchanged tree is never released twice.
 
 #### Breaking changes
 
@@ -204,10 +204,10 @@ task release          # bump, write CHANGELOG.md, create the annotated tag
 task release:publish  # push the bump commit and the tag
 ```
 
-`task release` first runs `task release:check` (clean tree, on `main`, in sync with `origin/main`), then calls `cz bump` which:
+`task release` first runs `task release:check` (clean tree, on `main`, in sync with `origin/main`, at least one commit since the last tag), then calls `cz bump` which:
 
 - reads commits since the last `v*` tag,
-- picks the SemVer bump from the types it sees,
+- picks the SemVer bump from the types it sees, or a patch bump when none of them drives one,
 - updates `CHANGELOG.md`,
 - bumps `version =` in `pyproject.toml` and the "Current SDK package version" line in [README.md](README.md),
 - commits the bump and creates the annotated tag.
