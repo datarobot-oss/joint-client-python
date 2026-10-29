@@ -15,7 +15,7 @@ external users — please read this guide before opening a pull request.
 ## Reporting Issues
 
 - **Bugs and feature requests:** open a GitHub issue at
-  [datarobot/joint-client-python](https://github.com/datarobot/joint-client-python/issues)
+  [datarobot-oss/joint-client-python](https://github.com/datarobot-oss/joint-client-python/issues)
   with a minimal reproduction, the SDK version (`python -c "import
   jointfm_client; print(jointfm_client.__version__)"`), and the Python version.
 - **Security issues:** do not open a public issue. Follow the disclosure

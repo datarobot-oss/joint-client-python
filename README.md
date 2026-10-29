@@ -1,6 +1,6 @@
 <p align="center">
-  <a href="https://github.com/datarobot/joint-client-python">
-    <img src="https://raw.githubusercontent.com/datarobot/joint-client-python/main/.github/datarobot_logo.avif" width="600px" alt="DataRobot Logo"/>
+  <a href="https://github.com/datarobot-oss/joint-client-python">
+    <img src="https://raw.githubusercontent.com/datarobot-oss/joint-client-python/main/.github/datarobot_logo.avif" width="600px" alt="DataRobot Logo"/>
   </a>
 </p>
 <h3 align="center">JointFM Python Client</h3>
@@ -10,14 +10,14 @@
   ·
   <a href="https://pypi.org/project/jointfm-client/">PyPI</a>
   ·
-  <a href="https://github.com/datarobot/joint-client-python/blob/main/docs/api-reference.md">API reference</a>
+  <a href="https://github.com/datarobot-oss/joint-client-python/blob/main/docs/api-reference.md">API reference</a>
   ·
   <a href="https://docs.datarobot.com/en/docs/get-started/troubleshooting/general-help.html">Support</a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/datarobot/joint-client-python/actions/workflows/ci.yml">
-    <img src="https://github.com/datarobot/joint-client-python/actions/workflows/ci.yml/badge.svg" alt="CI">
+  <a href="https://github.com/datarobot-oss/joint-client-python/actions/workflows/ci.yml">
+    <img src="https://github.com/datarobot-oss/joint-client-python/actions/workflows/ci.yml/badge.svg" alt="CI">
   </a>
   <a href="https://pypi.org/project/jointfm-client/">
     <img src="https://img.shields.io/pypi/v/jointfm-client" alt="PyPI version">
@@ -25,8 +25,8 @@
   <a href="https://pypi.org/project/jointfm-client/">
     <img src="https://img.shields.io/pypi/pyversions/jointfm-client" alt="Python versions">
   </a>
-  <a href="https://github.com/datarobot/joint-client-python/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/datarobot/joint-client-python" alt="License">
+  <a href="https://github.com/datarobot-oss/joint-client-python/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/datarobot-oss/joint-client-python" alt="License">
   </a>
 </p>
 
@@ -378,7 +378,7 @@ High-level forecast helpers build the same validated request payloads as `build_
 
 ## Support
 
-- **Bugs and questions:** open an issue at [datarobot/joint-client-python](https://github.com/datarobot/joint-client-python/issues).
+- **Bugs and questions:** open an issue at [datarobot-oss/joint-client-python](https://github.com/datarobot-oss/joint-client-python/issues).
 - **Security issues:** do not open a public issue; follow [SECURITY.md](SECURITY.md).
 - **DataRobot platform help:** see [DataRobot support](https://docs.datarobot.com/en/docs/get-started/troubleshooting/general-help.html).
 

@@ -77,3 +77,48 @@ reason = "virtualenv (dev only): fixed release is still inside the uv exclude-ne
 id = "GHSA-qmx5-4p3x-wvqf"
 ignoreUntil = 2026-11-05T00:00:00Z
 reason = "virtualenv (dev only): fixed release is still inside the uv exclude-newer cooldown"
+
+[[IgnoredVulns]]
+id = "GHSA-r4j5-9xpp-3985"
+ignoreUntil = 2026-11-05T00:00:00Z
+reason = "tornado (dev only): fixed release is still inside the uv exclude-newer cooldown"
+
+[[IgnoredVulns]]
+id = "GHSA-69hj-f68j-2879"
+ignoreUntil = 2026-11-05T00:00:00Z
+reason = "filelock (dev only): fixed release is still inside the uv exclude-newer cooldown"
+
+[[IgnoredVulns]]
+id = "GHSA-8mx5-7m5m-r77g"
+ignoreUntil = 2026-11-05T00:00:00Z
+reason = "filelock (dev only): fixed release is still inside the uv exclude-newer cooldown"
+
+[[IgnoredVulns]]
+id = "GHSA-cwqr-hh33-gh44"
+ignoreUntil = 2026-11-05T00:00:00Z
+reason = "filelock (dev only): fixed release is still inside the uv exclude-newer cooldown"
+
+[[IgnoredVulns]]
+id = "GHSA-fq56-3cx3-fjxp"
+ignoreUntil = 2026-11-05T00:00:00Z
+reason = "filelock (dev only): fixed release is still inside the uv exclude-newer cooldown"
+
+[[IgnoredVulns]]
+id = "GHSA-j8f7-rjxc-mr56"
+ignoreUntil = 2026-11-05T00:00:00Z
+reason = "filelock (dev only): fixed release is still inside the uv exclude-newer cooldown"
+
+[[IgnoredVulns]]
+id = "GHSA-rfpc-qcw5-3pc4"
+ignoreUntil = 2026-11-05T00:00:00Z
+reason = "filelock (dev only): fixed release is still inside the uv exclude-newer cooldown"
+
+[[IgnoredVulns]]
+id = "GHSA-pcg2-g6cj-q92c"
+ignoreUntil = 2026-11-05T00:00:00Z
+reason = "tornado (dev only): fixed release is still inside the uv exclude-newer cooldown"
+
+[[IgnoredVulns]]
+id = "GHSA-pw9p-v7r6-gx4p"
+ignoreUntil = 2026-11-05T00:00:00Z
+reason = "tornado (dev only): fixed release is still inside the uv exclude-newer cooldown"
