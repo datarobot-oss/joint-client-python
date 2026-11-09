@@ -125,7 +125,15 @@ def _build_parser() -> argparse.ArgumentParser:
         choices=("mean", "samples", "quantiles"),
         default=DEFAULT_CLI_RETURN_MODE,
     )
-    forecast_parser.add_argument("--n-samples", type=int)
+    forecast_parser.add_argument(
+        "--n-samples",
+        type=int,
+        help=(
+            "Draws behind a sampled answer; defaults to the deployment's "
+            "max_sample_count. JointFM 1 means and quantiles are exact and "
+            "need none, except under an interval condition."
+        ),
+    )
     forecast_parser.add_argument(
         "--quantiles",
         help="Comma-separated quantile levels for quantile forecasts.",

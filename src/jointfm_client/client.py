@@ -385,6 +385,15 @@ class JointFMClient:
 
         ``query_rows`` carries the observed values at ``query_times`` that
         ``return_mode='log_prob'`` scores, in the same shape as ``history``.
+
+        ``n_samples`` is the number of draws behind an answer that samples;
+        omitted, the deployment uses its advertised ``max_sample_count``. A
+        JointFM 1 deployment answers ``mean`` and ``quantiles`` exactly, the
+        same for every ``n_samples`` and ``seed``, except at positions an
+        interval condition covers, whose answers rest on draws. There
+        ``n_samples`` sets the size of ``samples`` and the draws behind
+        interval-conditioned answers. A deployment whose head estimates means
+        or quantiles by sampling reads it for those too.
         """
         self._require_predict_url("forecast")
         if condition is not None:
@@ -564,7 +573,9 @@ class JointFMClient:
         """Forecast quantiles through the shared forecast validation path.
 
         With ``condition`` the quantiles at each covered position describe the
-        conditional there; see :meth:`forecast`.
+        conditional there; see :meth:`forecast`. A JointFM 1 deployment's
+        quantiles are exact and ignore ``n_samples`` and ``seed``, except at
+        positions an interval condition covers; see :meth:`forecast`.
         """
         return cast(
             QuantileForecastResult,
