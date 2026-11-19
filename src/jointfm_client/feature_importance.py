@@ -16,19 +16,27 @@
 
 Each feature column is shuffled across history rows while its marginal is
 preserved, and the permuted forecast is compared against one shared baseline
-forecast. Two scores come out of that comparison: the absolute shift in
-forecast mean, and the centered squared 2-Wasserstein distance between the
-baseline and permuted sample sets (which also catches shape changes a mean
-shift alone would miss).
+forecast. A forecast reads mostly a feature's last few values, and one shuffle
+can leave similar values there by chance, so each feature is shuffled
+``n_repeats`` times and its scores are averaged. Two scores come out of each
+comparison: the absolute shift in forecast mean, and the centered squared
+2-Wasserstein distance between the baseline and permuted sample sets (which
+also catches shape changes a mean shift alone would miss).
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 import random
-from typing import Any
+from typing import Any, Final
 
 import numpy as np
+
+DEFAULT_IMPORTANCE_REPEATS: Final[int] = 5
+# Distinct primes keep (feature, repeat) seeds apart for fewer than 7919
+# features and 1009 repeats.
+FEATURE_SEED_STRIDE: Final[int] = 1009
+REPEAT_SEED_STRIDE: Final[int] = 7919
 
 
 def sample_w2_distance(
@@ -97,6 +105,34 @@ def permute_history_column(history: Any, feature: str, *, seed: int) -> Any:
     return permuted
 
 
+def permutation_seed(seed: int, *, feature_index: int, repeat: int) -> int:
+    """Return the shuffle seed for one repeat of one feature column."""
+    return (
+        seed + FEATURE_SEED_STRIDE * (feature_index + 1) + REPEAT_SEED_STRIDE * repeat
+    )
+
+
+def average_importance_entries(entries: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """Average repeated entries of one feature, score by score.
+
+    Every entry must come from ``feature_importance_entry`` for the same
+    feature, targets, and horizons; the result has the same layout.
+    """
+    first = entries[0]
+    averaged: dict[str, Any] = {"feature": first["feature"]}
+    for score in ("mean", "distance"):
+        averaged[score] = {
+            target: {
+                horizon: float(
+                    np.mean([entry[score][target][horizon] for entry in entries])
+                )
+                for horizon in by_horizon
+            }
+            for target, by_horizon in first[score].items()
+        }
+    return averaged
+
+
 def feature_importance_entry(
     *,
     feature: str,
@@ -145,7 +181,10 @@ def _require_pandas_module() -> Any:
 
 
 __all__ = [
+    "DEFAULT_IMPORTANCE_REPEATS",
+    "average_importance_entries",
     "feature_importance_entry",
+    "permutation_seed",
     "permute_history_column",
     "sample_w2_distance",
 ]

@@ -47,6 +47,7 @@ jointfm-client = "jointfm_client.cli:main"
 
 [project.optional-dependencies]
 notebooks = [
+    "matplotlib>=3.11.2",
     "pandas>=3.0.2",
 ]
 
