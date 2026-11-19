@@ -62,7 +62,10 @@ from jointfm_client.exceptions import (
     UnsupportedModelVersionError,
 )
 from jointfm_client.feature_importance import (
+    DEFAULT_IMPORTANCE_REPEATS,
+    average_importance_entries,
     feature_importance_entry,
+    permutation_seed,
     permute_history_column,
 )
 from jointfm_client.contract import (
@@ -658,12 +661,18 @@ class JointFMClient:
         model_version: str | None = None,
         n_samples: int = 1024,
         seed: int = 7,
+        n_repeats: int = DEFAULT_IMPORTANCE_REPEATS,
     ) -> list[dict[str, Any]]:
         """Permutation feature importance for each feature, target, and horizon.
 
         For every column in ``feature_columns``, the column is shuffled across
         history rows (preserving its marginal) and scored against one shared
-        baseline forecast sampled from the unpermuted history. ``horizons`` are
+        baseline forecast sampled from the unpermuted history. Each column is
+        shuffled ``n_repeats`` times, each time anew, and its scores are the
+        averages over those shuffles: a forecast reads mostly a feature's last
+        few values, and a single shuffle can leave similar values there by
+        chance, which scores a real driver near zero. The call sends
+        ``1 + n_repeats * len(feature_columns)`` sample forecasts. ``horizons`` are
         integer labels for the output, paired by position with ``query_times``
         (``horizons[i]`` names the forecast step requested by
         ``query_times[i]``).
@@ -676,6 +685,8 @@ class JointFMClient:
         would miss. Both are computed from the same permuted-forecast sample
         set, at the same seed and sample count as the baseline.
         """
+        if n_repeats < 1:
+            raise ValueError(f"n_repeats must be at least 1; got {n_repeats}")
         if len(feature_columns) == 0:
             raise ValueError("feature_columns must not be empty")
         if len(target_columns) == 0:
@@ -702,32 +713,39 @@ class JointFMClient:
 
         entries: list[dict[str, Any]] = []
         for feature_index, feature in enumerate(feature_columns):
-            permuted_history = permute_history_column(
-                history, feature, seed=seed + 1009 * (feature_index + 1)
-            )
-            permuted = self._sample_forecast_for_importance(
-                permuted_history,
-                query_times=query_times,
-                schema=schema,
-                time_index_mode=time_index_mode,
-                columns=columns,
-                time_column=time_column,
-                target_columns=target_columns,
-                feature_columns=feature_columns,
-                model_version=model_version,
-                n_samples=n_samples,
-                seed=seed,
-            )
-            entries.append(
-                feature_importance_entry(
-                    feature=feature,
-                    horizons=horizons,
-                    target_columns=target_columns,
-                    baseline_samples=baseline.samples,
-                    permuted_samples=permuted.samples,
-                    baseline_columns=baseline.requested_columns,
+            repeat_entries: list[dict[str, Any]] = []
+            for repeat in range(n_repeats):
+                permuted_history = permute_history_column(
+                    history,
+                    feature,
+                    seed=permutation_seed(
+                        seed, feature_index=feature_index, repeat=repeat
+                    ),
                 )
-            )
+                permuted = self._sample_forecast_for_importance(
+                    permuted_history,
+                    query_times=query_times,
+                    schema=schema,
+                    time_index_mode=time_index_mode,
+                    columns=columns,
+                    time_column=time_column,
+                    target_columns=target_columns,
+                    feature_columns=feature_columns,
+                    model_version=model_version,
+                    n_samples=n_samples,
+                    seed=seed,
+                )
+                repeat_entries.append(
+                    feature_importance_entry(
+                        feature=feature,
+                        horizons=horizons,
+                        target_columns=target_columns,
+                        baseline_samples=baseline.samples,
+                        permuted_samples=permuted.samples,
+                        baseline_columns=baseline.requested_columns,
+                    )
+                )
+            entries.append(average_importance_entries(repeat_entries))
         return entries
 
     def _sample_forecast_for_importance(

@@ -23,6 +23,8 @@ import pytest
 
 from jointfm_client import ColumnSpec, DataFrameSchema, JointFMClient
 from jointfm_client.feature_importance import (
+    DEFAULT_IMPORTANCE_REPEATS,
+    permutation_seed,
     permute_history_column,
     sample_w2_distance,
 )
@@ -97,6 +99,7 @@ def test_feature_importance_scores_mean_shift_and_distribution_distance() -> Non
         columns=columns,
         model_version=_MODEL_VERSION,
         n_samples=2,
+        n_repeats=1,
         seed=7,
     )
 
@@ -161,6 +164,7 @@ def test_feature_importance_accepts_dataframe_history_with_explicit_schema() -> 
         schema=schema,
         model_version=_MODEL_VERSION,
         n_samples=2,
+        n_repeats=1,
         seed=7,
     )
 
@@ -174,6 +178,84 @@ def test_feature_importance_accepts_dataframe_history_with_explicit_schema() -> 
     assert len(transport.payloads) == 2
     # the original frame is untouched by the conversion/permutation
     assert frame["feat"].tolist() == [1.0, 2.0]
+
+
+def test_feature_importance_averages_scores_over_repeated_shuffles() -> None:
+    """Each feature's scores average over n_repeats shuffles, five by default.
+
+    Repeat r shifts the horizon-1 mean by r and widens the horizon-2 spread
+    from +-1 to +-(1 + r), so its distance there is r**2 / 2; the averages
+    over r = 1..5 are 3.0 and 5.5.
+    """
+    baseline = [[[10.0], [20.0]], [[12.0], [22.0]]]
+    repeats = [
+        [[[10.0 + r], [20.0 - r]], [[12.0 + r], [22.0 + r]]]
+        for r in range(1, DEFAULT_IMPORTANCE_REPEATS + 1)
+    ]
+    transport = _ImportanceTransport(sample_batches=[baseline, *repeats])
+    client = JointFMClient(
+        predict_url="http://localhost:8080/predict",
+        transport=transport,
+    )
+    columns = (
+        ColumnSpec(name="target", modality="numeric", role="target"),
+        ColumnSpec(name="feat", modality="numeric", role="feature"),
+    )
+    history = [{"target": 10.0 + i, "feat": float(i)} for i in range(8)]
+
+    result = client.feature_importance(
+        history,
+        query_times=[2, 3],
+        horizons=[1, 2],
+        feature_columns=["feat"],
+        target_columns=["target"],
+        columns=columns,
+        model_version=_MODEL_VERSION,
+        n_samples=2,
+        seed=7,
+    )
+
+    assert result == [
+        {
+            "feature": "feat",
+            "mean": {"target": {1: 3.0, 2: 0.0}},
+            "distance": {"target": {1: 0.0, 2: 5.5}},
+        }
+    ]
+    assert len(transport.payloads) == 1 + DEFAULT_IMPORTANCE_REPEATS
+    assert {payload["seed"] for payload in transport.payloads} == {7}
+    shuffles = [
+        tuple(row["feat"] for row in payload["history_rows"])
+        for payload in transport.payloads[1:]
+    ]
+    assert len(set(shuffles)) == DEFAULT_IMPORTANCE_REPEATS
+
+
+def test_feature_importance_requires_positive_n_repeats() -> None:
+    """feature_importance rejects n_repeats below one."""
+    client = JointFMClient(predict_url="http://localhost:8080/predict")
+
+    with pytest.raises(ValueError, match="n_repeats must be at least 1"):
+        client.feature_importance(
+            [{"target": 10.0, "feat": 1.0}],
+            query_times=[2],
+            horizons=[1],
+            feature_columns=["feat"],
+            target_columns=["target"],
+            model_version=_MODEL_VERSION,
+            n_repeats=0,
+        )
+
+
+def test_permutation_seed_is_distinct_per_feature_and_repeat() -> None:
+    """Every (feature, repeat) pair shuffles with its own seed."""
+    seeds = {
+        permutation_seed(7, feature_index=feature_index, repeat=repeat)
+        for feature_index in range(50)
+        for repeat in range(20)
+    }
+
+    assert len(seeds) == 50 * 20
 
 
 def test_feature_importance_requires_non_empty_feature_columns() -> None:
