@@ -10,6 +10,12 @@ Releases are cut with `task release`, which uses Commitizen to read
 release tag, infer the next SemVer bump, prepend the new section here,
 commit the bump, and create an annotated tag.
 
+## v0.16.1 (2026-11-20)
+
+### Feat
+
+- Average permutation feature importance over n_repeats shuffles per feature and demonstrate it on a synthetic history with a known driver and a placebo column
+
 ## v0.16.0 (2026-11-09)
 
 ### Feat
