@@ -32,7 +32,7 @@
 
 `jointfm-client` is the Python client for JointFM, DataRobot's forecasting foundation model. Given a running JointFM service, it builds and validates forecast requests, checks that the service speaks the same contract, and returns forecasts as NumPy arrays or pandas frames. It also installs a `jointfm-client` command for health checks and CSV forecasts.
 
-> **Status: alpha.** The API and the service contract can still change. While the version is `0.x`, a breaking change ships as a minor version bump, so pin a single minor series (`jointfm-client~=0.N.0`) if you need stability.
+> **Status: beta.** While the version is `0.x`, a breaking change to the API ships as a minor version bump, so pin a single minor series (`jointfm-client~=0.N.0`) if you need stability.
 
 ## Before You Start: A JointFM Service
 
@@ -41,7 +41,7 @@ This package is only the client. It contains no model and no weights: every call
 - **A service you run yourself**, on your own machine or GPU host. Point the client at its base URL with `JOINTFM_LOCAL_BASE_URL`. No DataRobot account is needed.
 - **A JointFM deployment hosted on DataRobot.** Point the client at it with `DATAROBOT_ENDPOINT`, `DATAROBOT_API_TOKEN`, and `JOINTFM_DEPLOYMENT_ID`.
 
-Running the server, deploying it, and obtaining model weights are covered by the JointFM inference server project, which is not public yet. This README will link to it once it is published.
+To run a service yourself, use the JointFM inference runner, [`jointfm-inference`](https://github.com/datarobot-oss/joint-inference-python) ([PyPI](https://pypi.org/project/jointfm-inference/)). Its README covers installing and starting it, the hardware it needs, its settings, and its container image; how to obtain model weights will be documented there. An application can also start the service itself, with both packages in its own environment: see [Start from Python](https://github.com/datarobot-oss/joint-inference-python#start-from-python).
 
 ## Quick Start
 
