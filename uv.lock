@@ -736,7 +736,7 @@ wheels = [
 
 [[package]]
 name = "jointfm-client"
-version = "0.16.1"
+version = "0.16.2"
 source = { editable = "." }
 dependencies = [
     { name = "numpy" },
