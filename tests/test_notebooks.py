@@ -135,6 +135,7 @@ def test_example_notebooks_start_with_bootstrap_cell() -> None:
         "forecast_mean.ipynb",
         "forecast_quantiles.ipynb",
         "forecast_samples.ipynb",
+        "forecast_skipped_grid.ipynb",
         "max_utilization.ipynb",
         "pandas_result_conversion.ipynb",
         "predict_json.ipynb",

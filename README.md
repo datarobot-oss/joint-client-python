@@ -125,7 +125,60 @@ result = client.forecast_mean(
 print(result.to_pandas_tidy())
 ```
 
-Use `forecast_samples(...)` for sampled trajectories or `forecast_quantiles(...)` with `quantiles=(0.1, 0.5, 0.9)` for quantile surfaces. For pandas inputs, install the optional extra and pass a `DataFrame` to `forecast(...)` with `target_columns` and `requested_columns` set explicitly.
+Use `forecast_samples(...)` for sampled trajectories or `forecast_quantiles(...)` with `quantiles=(0.1, 0.5, 0.9)` for quantile surfaces; [Predictive Modes](#predictive-modes) lists everything a request can ask for. For pandas inputs, install the optional extra and pass a `DataFrame` to `forecast(...)` with `target_columns` and `requested_columns` set explicitly.
+
+## Predictive Modes
+
+A forecast request combines three choices: a **query mode** (what the forecast is given), a **return mode** (the form of the answer), and a **time index mode** (how history rows and query times are placed in time). Every query mode combines with every return mode. The tables below list every mode of the service contract, and their *JointFM 1* column says whether a JointFM 1 deployment serves it.
+
+### Query Modes
+
+| Query mode | What it asks | How to request it | JointFM 1 |
+| :--- | :--- | :--- | :--- |
+| `forecast` | The joint distribution of the declared columns at each query time, given the history. | Any forecast helper without `condition`. | Yes |
+| `condition`, kind `equality` | The same distribution, given that a column takes a stated value at the query times the condition covers. | `condition=EqualityCondition(...)` on any forecast helper. | Yes |
+| `condition`, kind `interval` | The same distribution, given that a column lies in a stated range at the query times the condition covers. | `condition=IntervalCondition(...)` on any forecast helper. | Yes |
+
+One request may carry several conditions of both kinds; [Conditional Queries](#conditional-queries) has the rules.
+
+### Return Modes
+
+| Return mode | What comes back | Helper | JointFM 1 |
+| :--- | :--- | :--- | :--- |
+| `mean` | The mean of each requested column at each query time. | `forecast_mean(...)` | Yes, exact |
+| `samples` | `n_samples` joint draws. At one query time, the values of a draw belong together across columns. | `forecast_samples(...)` | Yes; draws at different query times are independent |
+| `quantiles` | The requested quantile levels of each requested column at each query time, column by column. | `forecast_quantiles(...)` | Yes, exact |
+| `log_prob` | The log density the model assigns to future rows you already hold, passed as `query_rows`: one score per query time, over all declared columns. | `forecast_log_prob(...)` | Yes |
+
+On a JointFM 1 deployment, an exact answer is computed from the forecast distribution itself and is the same for every `n_samples` and `seed`; only at query times an interval condition covers do means and quantiles rest on draws. `forecast(...)` takes the return mode as `return_mode=`. `feature_importance(...)` is not a mode of the service: the client computes it from `samples` forecasts of histories in which one feature column is shuffled, so it works with every deployment that serves `samples`.
+
+### Time Index Modes
+
+| Time index mode | History times and query times | JointFM 1 |
+| :--- | :--- | :--- |
+| `ordinal` | Integer steps. Without a `time_column`, the row position. | Yes |
+| `continuous_float` | Real numbers, such as fractional days. | Yes, on a regular grid |
+| `absolute_datetime` | Timezone-aware timestamps; requires `time_column`. | Yes, on a regular grid |
+
+A JointFM 1 deployment reads times as positions on one regular grid, which its health metadata reports as `time_index_encoding="discrete_grid"`. An `ordinal` time is its position. In the other two modes the grid step is the smallest gap between consecutive times of the request, and every time must lie a whole number of steps after the first:
+
+| Times of a request | JointFM 1 |
+| :--- | :--- |
+| Regular grid: every row one step after the previous one. | Yes |
+| Skipped grid: gaps of several whole steps, in the history or between query times, such as weekends without trading. The positions inside a gap are skipped, and nothing is filled in. | Yes, in every time index mode |
+| Irregular times that share no common step. | No, refused |
+
+The history may span at most `n_input` grid positions and the last query time may lie at most `n_output` positions after the last history row, skipped positions included. `notebooks/forecast_skipped_grid.ipynb` forecasts two stocks that trade on weekdays only.
+
+Each deployment advertises the modes it serves in its health metadata:
+
+```python
+health = client.health(cache=True)
+print(health.generation)  # "jointfm-1" on a JointFM 1 deployment
+print(health.supported_query_modes, health.supported_condition_kinds)
+print(health.supported_return_modes)
+print(health.supported_time_index_modes, health.time_index_encoding)
+```
 
 ## Package Contract
 
@@ -135,7 +188,7 @@ Use `forecast_samples(...)` for sampled trajectories or `forecast_quantiles(...)
 - Current SDK package version: `0.16.1`
 - Current JointFM service schema: `schema_version="v6"`
 
-The public API shape is a synchronous low-level `JointFMClient` with `health()`, `health_instances()`, and `predict(payload)` methods plus high-level `forecast(...)`, `forecast_mean(...)`, `forecast_samples(...)`, and `forecast_quantiles(...)` helpers. The SDK is not a proxy service; callers use it as a local Python library that talks to the hosted or local JointFM endpoint.
+The public API shape is a synchronous low-level `JointFMClient` with `health()`, `health_instances()`, and `predict(payload)` methods plus high-level `forecast(...)`, `forecast_mean(...)`, `forecast_samples(...)`, `forecast_quantiles(...)`, `forecast_log_prob(...)`, and `feature_importance(...)` helpers. The SDK is not a proxy service; callers use it as a local Python library that talks to the hosted or local JointFM endpoint.
 
 SDK package versions are standard Python distribution versions: `[project].version` in `pyproject.toml` is the single declared value, and `jointfm_client.__version__` reports it back from the installed distribution metadata. JointFM `schema_version`, `image_version`, `model_version`, and `checkpoint_version` are service compatibility identifiers carried in configuration, health metadata, requests, and responses. They are not SDK package versions, and changing a deployment pin does not by itself require changing the SDK package version.
 
@@ -295,17 +348,18 @@ bootstrap_notebook(add_src_root=True)
 
 The notebooks run from a clone of this repository. Run `task setup` there first (see [CONTRIBUTING.md](CONTRIBUTING.md#local-setup)) so VS Code can select the registered `Python (joint-client-python)` notebook kernel backed by the clone's `.venv`.
 
-The bootstrap helper resolves the nearest src-layout Python project root, switches the working directory there, and prepends that project's local `src` tree during development. The examples cover hosted health checks, a maximum-utilization check, low-level JSON prediction, mean forecasts, sample forecasts, quantile forecasts, scoring held-out observations with log probability, permutation feature importance on a synthetic history with a known driver, read against a placebo column and checked at a second seed, conditional forecasts (one conditional read as a mean, as draws, as quantiles inside a bounded band, and as the log density of observed values, plus the ranking of candidate conditions), pandas/NumPy result conversion, and CSV forecast workflows. They use `.env.sample` placeholders and checked-in fixture payloads; no real tokens or deployment IDs are stored in notebooks.
+The bootstrap helper resolves the nearest src-layout Python project root, switches the working directory there, and prepends that project's local `src` tree during development. The examples cover hosted health checks, a maximum-utilization check, low-level JSON prediction, mean forecasts, sample forecasts, quantile forecasts, scoring held-out observations with log probability, permutation feature importance on a synthetic history with a known driver, read against a placebo column and checked at a second seed, conditional forecasts (one conditional read as a mean, as draws, as quantiles inside a bounded band, and as the log density of observed values, plus the ranking of candidate conditions), a weekday-only history forecast on a skipped grid, pandas/NumPy result conversion, and CSV forecast workflows. They use `.env.sample` placeholders and checked-in fixture payloads; no real tokens or deployment IDs are stored in notebooks.
 
 The current forecast request contract is:
 
 - `schema_version`: exactly `"v6"`, configured as `JOINTFM_SCHEMA_VERSION` for `from_env()` clients
 - `model_version`: exact model version advertised by `/healthz` or otherwise selected by the caller. Optional for `from_env()` clients: when `JOINTFM_MODEL_VERSION` is unset the SDK reads it from `/healthz` on first use; when set it acts as a drift-detection pin
 - `query_mode`: `"forecast"` for the unconditional forecast, or `"condition"` for the forecast given conditions on some columns; the high-level helpers set it from whether a `condition` was passed
-- `return_mode`: one of `"mean"`, `"samples"`, or `"quantiles"`
+- `return_mode`: one of `"mean"`, `"samples"`, `"quantiles"`, or `"log_prob"`
 - `time_index_mode`: one of `"ordinal"`, `"continuous_float"`, or `"absolute_datetime"`
 - `time_column`: required for `"absolute_datetime"`, and used for ordered ordinal or continuous histories when supplied
 - `query_times`: non-empty future forecast times only
+- `query_rows`: required with `return_mode="log_prob"` and forbidden otherwise. The observed rows to score, one per entry of `query_times`, each with a value for every declared column
 - `requested_columns`: optional column names or integer column indices, with duplicates rejected
 - `n_samples`: positive sample count for answers that sample; omitted, the deployment uses its `max_sample_count`. A JointFM 1 deployment answers means and quantiles exactly, the same for every `n_samples` and `seed`, except at positions an interval condition covers, so there `n_samples` sizes `samples` and the draws behind interval-conditioned answers. When `return_mode="samples"` exceeds the `max_sample_count` advertised by the deployment's health metadata, `forecast_samples(...)` splits the request into capped prediction batches up front and returns one merged `SampleForecastResult`. With a pool (`JOINTFM_DEPLOYMENT_IDS` or `JOINTFM_LOCAL_BASE_URLS`), every sample request is split evenly across all reachable endpoints, whatever its size, and each endpoint serves at most one of its batches at a time. Batch `i` uses seed `seed + i`, so a seeded result depends on how many endpoints were reachable.
 - `condition`: required with `query_mode="condition"` and forbidden otherwise. One `EqualityCondition` or `IntervalCondition`, or a list of them, each covering the future positions its `query_time_indices` names; sent on the wire as the `conditions` list, see below.
