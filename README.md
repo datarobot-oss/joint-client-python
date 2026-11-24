@@ -159,6 +159,7 @@ On a JointFM 1 deployment, an exact answer is computed from the forecast distrib
 | `ordinal` | Integer steps. Without a `time_column`, the row position. | Yes |
 | `continuous_float` | Real numbers, such as fractional days. | Yes, on a regular grid |
 | `absolute_datetime` | Timezone-aware timestamps; requires `time_column`. | Yes, on a regular grid |
+| `unordered` | None: a table whose rows have no order, sent through `predict_table(...)`; see [Tables](#tables). | No |
 
 A JointFM 1 deployment reads times as positions on one regular grid, which its health metadata reports as `time_index_encoding="discrete_grid"`. An `ordinal` time is its position. In the other two modes the grid step is the smallest gap between consecutive times of the request, and every time must lie a whole number of steps after the first:
 
@@ -188,7 +189,7 @@ print(health.supported_time_index_modes, health.time_index_encoding)
 - Current SDK package version: `0.16.2`
 - Current JointFM service schema: `schema_version="v6"`
 
-The public API shape is a synchronous low-level `JointFMClient` with `health()`, `health_instances()`, and `predict(payload)` methods plus high-level `forecast(...)`, `forecast_mean(...)`, `forecast_samples(...)`, `forecast_quantiles(...)`, `forecast_log_prob(...)`, and `feature_importance(...)` helpers. The SDK is not a proxy service; callers use it as a local Python library that talks to the hosted or local JointFM endpoint.
+The public API shape is a synchronous low-level `JointFMClient` with `health()`, `health_instances()`, and `predict(payload)` methods plus high-level `forecast(...)`, `forecast_mean(...)`, `forecast_samples(...)`, `forecast_quantiles(...)`, `forecast_log_prob(...)`, `predict_table(...)`, and `feature_importance(...)` helpers. The SDK is not a proxy service; callers use it as a local Python library that talks to the hosted or local JointFM endpoint.
 
 SDK package versions are standard Python distribution versions: `[project].version` in `pyproject.toml` is the single declared value, and `jointfm_client.__version__` reports it back from the installed distribution metadata. JointFM `schema_version`, `image_version`, `model_version`, and `checkpoint_version` are service compatibility identifiers carried in configuration, health metadata, requests, and responses. They are not SDK package versions, and changing a deployment pin does not by itself require changing the SDK package version.
 
@@ -364,6 +365,27 @@ The current forecast request contract is:
 - `n_samples`: positive sample count for answers that sample; omitted, the deployment uses its `max_sample_count`. A JointFM 1 deployment answers means and quantiles exactly, the same for every `n_samples` and `seed`, except at positions an interval condition covers, so there `n_samples` sizes `samples` and the draws behind interval-conditioned answers. When `return_mode="samples"` exceeds the `max_sample_count` advertised by the deployment's health metadata, `forecast_samples(...)` splits the request into capped prediction batches up front and returns one merged `SampleForecastResult`. With a pool (`JOINTFM_DEPLOYMENT_IDS` or `JOINTFM_LOCAL_BASE_URLS`), every sample request is split evenly across all reachable endpoints, whatever its size, and each endpoint serves at most one of its batches at a time. Batch `i` uses seed `seed + i`, so a seeded result depends on how many endpoints were reachable.
 - `condition`: required with `query_mode="condition"` and forbidden otherwise. One `EqualityCondition` or `IntervalCondition`, or a list of them, each covering the future positions its `query_time_indices` names; sent on the wire as the `conditions` list, see below.
 
+### Tables
+
+A table has no time axis. `predict_table(...)` sends its context rows as `history`, its query rows as `query_rows`, and names the cells to predict in `requested_cells`: per row list, a mapping from a column name to the row positions whose cell it requests. Any cell can be requested, whatever its column's role: a gap in a context row, and any cells of a query row, a feature column's included. Every query row requests at least one cell, and a requested cell is left missing, except under `return_mode="log_prob"`, which scores the value it holds:
+
+```python
+result = client.predict_table(
+	listings,  # context rows, one price missing
+	query_rows=new_listings,  # their prices missing, one room count missing
+	requested_cells={
+		"history_rows": {"price": [1]},
+		"query_rows": {"price": [0, 1], "rooms": [1]},
+	},
+	target_columns=["price"],
+	return_mode="quantiles",
+	quantiles=(0.1, 0.5, 0.9),
+)
+print(result.to_pandas_tidy())  # one row per quantile and requested cell
+```
+
+The deployment reads each query row against the context rows and its own cells alone, so its answer does not depend on which other query rows share the request. The answer covers the rows that carry a requested cell (`result.rows`, context rows first) and the columns that hold one (`result.requested_columns`, in declared order), with NaN in every cell the request did not ask for; `result.requested_cells` marks the requested ones. Every return mode is served, and `log_prob` scores each answer row jointly over its requested cells. A deployment answers tables when its `/healthz` lists `unordered` in `supported_time_index_modes`, which no JointFM 1 deployment does; the client checks that before sending and refuses with `UnsupportedServiceContractError` otherwise. Table samples are not split across requests, so `n_samples` stays within the advertised `max_sample_count`.
+
 ### Conditional Queries
 
 The `condition` query mode asks for the forecast *given* something about some of its columns. Each condition names the future positions it covers by index into `query_times` through `query_time_indices`, and covers every position when that is `None`. Two conditions on the same column must cover disjoint positions; conditions on different columns may share positions, which is how one position mixes both kinds:
@@ -424,7 +446,7 @@ Known error codes are `VALIDATION_ERROR`, `UNSUPPORTED_HEAD_QUERY_COMBINATION`, 
 
 ## Compatibility Policy
 
-The SDK supports only `schema_version="v6"`. `validate_service_metadata()` checks `/healthz` metadata and raises typed compatibility errors before prediction if the service advertises a different schema, an unexpected model version, mode capabilities outside the recorded service contract, or an unsupported `decoding_strategy`. Return modes and time-index modes must match the SDK's lists exactly. Query modes and condition kinds are derived by the service from the mounted head, so a deployment may advertise fewer of them than the SDK knows; it must advertise at least one query mode and nothing the SDK does not know.
+The SDK supports only `schema_version="v6"`. `validate_service_metadata()` checks `/healthz` metadata and raises typed compatibility errors before prediction if the service advertises a different schema, an unexpected model version, mode capabilities outside the recorded service contract, or an unsupported `decoding_strategy`. Return modes must match the SDK's list exactly. Query modes, condition kinds, and time-index modes are derived by the service from the mounted model, so a deployment may advertise fewer of them than the SDK knows; it must advertise at least one query mode and one time-index mode, and nothing the SDK does not know.
 
 Callers should pass an expected `model_version` when they already know which deployment artifact they intend to use. A mismatch is treated as a hard compatibility error rather than silently downgrading, guessing, or retrying another model.
 

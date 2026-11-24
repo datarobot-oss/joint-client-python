@@ -77,6 +77,13 @@ from jointfm_client.contract import (
     SampleForecastResult,
 )
 from jointfm_client.pool import HealthInstances, InstanceHealth, JointFMInstancePool
+from jointfm_client.tables import (
+    RequestedCells,
+    TableResponse,
+    build_table_payload,
+    build_table_payload_from_dataframe,
+    require_table_support,
+)
 from jointfm_client.settings import (
     JointFMSettings,
     build_hosted_deployment_url,
@@ -645,6 +652,103 @@ class JointFMClient:
                 query_rows=query_rows,
             ),
         )
+
+    def predict_table(
+        self,
+        history: Any,
+        *,
+        query_rows: Any,
+        requested_cells: RequestedCells,
+        columns: Sequence[ColumnSpec] | None = None,
+        return_mode: ReturnMode = "mean",
+        model_version: str | None = None,
+        n_samples: int | None = None,
+        quantiles: Sequence[float | int] | None = None,
+        seed: int | None = None,
+        schema_version: str | None = None,
+        target_columns: Sequence[str] | None = None,
+        feature_columns: Sequence[str] | None = None,
+        column_roles: Mapping[str, ColumnRole] | None = None,
+        categorical_columns: Sequence[str] | None = None,
+        categorical_mappings: Mapping[str, Mapping[str | int, int]] | None = None,
+        ordinal_columns: Sequence[str] | None = None,
+        ordinal_mappings: Mapping[str, Mapping[str | int, int]] | None = None,
+        count_columns: Sequence[str] | None = None,
+        nullable_columns: Sequence[str] | None = None,
+        bounds: Mapping[str, tuple[float | int | None, float | int | None]]
+        | None = None,
+    ) -> TableResponse:
+        """Predict cells of a table from its context rows and query rows.
+
+        ``history`` holds the table's context rows and ``query_rows`` its query
+        rows, both as pandas ``DataFrame`` objects or as sequences of row
+        mappings, which need ``columns``. ``requested_cells`` names the cells
+        to predict per row list, by row position:
+        ``{"history_rows": {"price": [1]}, "query_rows": {"price": [0, 1]}}``
+        asks for the price of context row 1 and of query rows 0 and 1. Any
+        cell can be requested, a gap in a context row or any cell of a query
+        row, whatever its column's role, and every query row requests at least
+        one. A requested cell is left missing, except under
+        ``return_mode="log_prob"``, which scores the values it holds.
+
+        The deployment reads each query row against the context rows and its
+        own cells alone, so its answer does not depend on which other query
+        rows share the request. The result covers the rows and columns that
+        hold a requested cell, with NaN in every other cell. The deployment's
+        advertised time index modes are checked first, so a deployment that
+        answers no tables, such as every JointFM 1 deployment, is refused here
+        rather than after a round trip. Table samples are not split across
+        requests: ``n_samples`` stays within the advertised
+        ``max_sample_count``.
+        """
+        self._require_predict_url("predict_table")
+        require_table_support(self.health(cache=True))
+        resolved_model_version = self._resolve_model_version(
+            model_version=model_version,
+        )
+        resolved_schema_version = self._resolve_schema_version(schema_version)
+        if _is_history_row_sequence(history):
+            if columns is None:
+                raise ValueError("columns is required for row-sequence tables")
+            payload = build_table_payload(
+                model_version=resolved_model_version,
+                columns=columns,
+                history_rows=cast(Sequence[Mapping[str, Any]], history),
+                query_rows=cast(Sequence[Mapping[str, Any]], query_rows),
+                requested_cells=requested_cells,
+                return_mode=return_mode,
+                n_samples=n_samples,
+                quantiles=quantiles,
+                seed=seed,
+                schema_version=resolved_schema_version,
+            )
+        else:
+            payload = build_table_payload_from_dataframe(
+                history,
+                query_rows,
+                model_version=resolved_model_version,
+                requested_cells=requested_cells,
+                columns=columns,
+                return_mode=return_mode,
+                n_samples=n_samples,
+                quantiles=quantiles,
+                seed=seed,
+                schema_version=resolved_schema_version,
+                target_columns=target_columns,
+                feature_columns=feature_columns,
+                column_roles=column_roles,
+                categorical_columns=categorical_columns,
+                categorical_mappings=categorical_mappings,
+                ordinal_columns=ordinal_columns,
+                ordinal_mappings=ordinal_mappings,
+                count_columns=count_columns,
+                nullable_columns=nullable_columns,
+                bounds=bounds,
+            )
+        hinted_columns = [column for column in payload["columns"] if "traits" in column]
+        if hinted_columns:
+            require_metadata_trait_support(self.health(cache=True), hinted_columns)
+        return _table_response_from_payload(self._post_predict_json(payload), payload)
 
     def feature_importance(
         self,
@@ -1231,6 +1335,23 @@ def _forecast_response_from_payload(
     except ValueError as error:
         raise JointFMServiceError(
             f"JointFM forecast response violated the service contract: {error}"
+        ) from error
+
+
+def _table_response_from_payload(
+    response_payload: Mapping[str, Any],
+    request_payload: Mapping[str, Any],
+) -> TableResponse:
+    try:
+        return TableResponse.from_payload(
+            response_payload,
+            request_payload=request_payload,
+        )
+    except JointFMServiceError:
+        raise
+    except ValueError as error:
+        raise JointFMServiceError(
+            f"JointFM table response violated the service contract: {error}"
         ) from error
 
 

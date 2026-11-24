@@ -1,0 +1,82 @@
+{
+  "schema_version": "v6",
+  "model_version": "jointfm-serving:0.2.0+ckpt.table-1",
+  "query_mode": "forecast",
+  "return_mode": "quantiles",
+  "time_index_mode": "unordered",
+  "columns": [
+    {
+      "name": "size",
+      "modality": "numeric"
+    },
+    {
+      "name": "rooms",
+      "modality": "numeric"
+    },
+    {
+      "name": "price",
+      "modality": "numeric",
+      "role": "target"
+    }
+  ],
+  "history_rows": [
+    {
+      "size": 50.0,
+      "rooms": 2.0,
+      "price": 210.0
+    },
+    {
+      "size": 72.0,
+      "rooms": 3.0,
+      "price": null
+    },
+    {
+      "size": 95.0,
+      "rooms": 4.0,
+      "price": 380.0
+    },
+    {
+      "size": 61.0,
+      "rooms": 2.0,
+      "price": 250.0
+    },
+    {
+      "size": 120.0,
+      "rooms": 5.0,
+      "price": 470.0
+    }
+  ],
+  "query_rows": [
+    {
+      "size": 80.0,
+      "rooms": 3.0,
+      "price": null
+    },
+    {
+      "size": 105.0,
+      "rooms": null,
+      "price": null
+    }
+  ],
+  "requested_cells": {
+    "history_rows": {
+      "price": [
+        1
+      ]
+    },
+    "query_rows": {
+      "rooms": [
+        1
+      ],
+      "price": [
+        0,
+        1
+      ]
+    }
+  },
+  "quantiles": [
+    0.1,
+    0.9
+  ],
+  "seed": 3
+}

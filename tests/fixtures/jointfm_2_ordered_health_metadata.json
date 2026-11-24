@@ -1,0 +1,44 @@
+{
+  "status": "ok",
+  "schema_version": "v6",
+  "image_version": "0.2.0",
+  "model_version": "jointfm-serving:0.2.0+ckpt.wire-1",
+  "checkpoint_version": "wire-1",
+  "checkpoint_path": "/models/jointfm.pt",
+  "device": "cpu",
+  "precision": "bf16",
+  "generation": "jointfm-2",
+  "head": "gmm",
+  "tail_map": "none",
+  "decoding_strategy": "parallel_dense",
+  "supported_query_modes": [
+    "forecast",
+    "complete"
+  ],
+  "supported_condition_kinds": [],
+  "supported_metadata_traits": [],
+  "supported_return_modes": [
+    "log_prob",
+    "mean",
+    "quantiles",
+    "samples"
+  ],
+  "supported_time_index_modes": [
+    "absolute_datetime",
+    "continuous_float",
+    "ordinal"
+  ],
+  "time_index_encoding": "continuous_time",
+  "max_sample_count": 8,
+  "sample_row_draws": 131072,
+  "max_request_bytes": 65536,
+  "max_concurrent_requests": 1,
+  "data_generation": {
+    "min_series": 1,
+    "max_series": 3,
+    "t_input": 2.0,
+    "t_output": 1.0,
+    "n_input": 20,
+    "n_output": 2
+  }
+}

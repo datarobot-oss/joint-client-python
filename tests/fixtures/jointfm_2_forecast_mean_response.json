@@ -1,0 +1,33 @@
+{
+  "checkpoint_version": "table-1",
+  "diagnostics": {
+    "history_rows": 5,
+    "horizon_count": 1,
+    "seed": 3
+  },
+  "errors": [],
+  "head": "gmm",
+  "image_version": "0.2.0",
+  "model_version": "jointfm-serving:0.2.0+ckpt.table-1",
+  "outputs": {
+    "log_prob": null,
+    "mean": [
+      [
+        240.20607
+      ]
+    ],
+    "quantiles": null,
+    "query_times": [
+      5
+    ],
+    "requested_columns": [
+      "price"
+    ],
+    "rows": null,
+    "samples": null
+  },
+  "plausibility": null,
+  "query_mode": "forecast",
+  "return_mode": "mean",
+  "schema_version": "v6"
+}

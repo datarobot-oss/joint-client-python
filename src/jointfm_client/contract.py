@@ -97,6 +97,14 @@ StructuredErrorCode: TypeAlias = Literal[
 ]
 
 SUPPORTED_QUERY_MODES: Final[tuple[QueryMode, ...]] = ("forecast", "condition")
+# A completion asks an ordered request for cells of its own history rows; a
+# deployment that answers it advertises this mode beside the ones this SDK
+# sends, and the SDK reads the advertisement without sending the mode.
+COMPLETE_QUERY_MODE: Final = "complete"
+KNOWN_QUERY_MODES: Final[tuple[str, ...]] = (
+    *SUPPORTED_QUERY_MODES,
+    COMPLETE_QUERY_MODE,
+)
 SUPPORTED_CONDITION_KINDS: Final[tuple[ConditionKind, ...]] = ("equality", "interval")
 SUPPORTED_RETURN_MODES: Final[tuple[ReturnMode, ...]] = (
     "mean",
@@ -108,6 +116,13 @@ SUPPORTED_TIME_INDEX_MODES: Final[tuple[TimeIndexMode, ...]] = (
     "ordinal",
     "continuous_float",
     "absolute_datetime",
+)
+# A table has no time axis; a deployment that answers table requests
+# advertises this mode beside the forecast modes.
+TABLE_TIME_INDEX_MODE: Final = "unordered"
+KNOWN_TIME_INDEX_MODES: Final[tuple[str, ...]] = (
+    *SUPPORTED_TIME_INDEX_MODES,
+    TABLE_TIME_INDEX_MODE,
 )
 SUPPORTED_DECODING_STRATEGIES: Final[tuple[DecodingStrategy, ...]] = (
     "parallel_dense",
@@ -1210,8 +1225,11 @@ class ForecastOutputs:
 
         ``nullable_columns`` names the columns the request declared nullable:
         in those columns a ``null`` value is the observed missing state and
-        parses to NaN; everywhere else ``null`` is refused.
+        parses to NaN; everywhere else ``null`` is refused. ``outputs.rows``
+        names the rows of a table answer, so a forecast's is ``null`` or, from
+        a service that answers no tables, absent.
         """
+        _require_none(payload.get("rows"), field="outputs.rows")
         query_times = tuple(
             _require_sequence(payload.get("query_times"), field="outputs.query_times")
         )
@@ -1778,7 +1796,12 @@ def validate_service_metadata(
 
     Requires the schema version in ``SCHEMA_VERSION``, the expected model
     version when supplied, the advertised query/return/time-index modes,
-    and a supported ``decoding_strategy``.
+    and a supported ``decoding_strategy``. Query modes are a non-empty subset
+    of ``KNOWN_QUERY_MODES``: a deployment that answers completions adds
+    ``COMPLETE_QUERY_MODE`` to the modes this SDK sends. Time-index modes are
+    a non-empty subset of ``KNOWN_TIME_INDEX_MODES``: a deployment that
+    answers tables adds ``TABLE_TIME_INDEX_MODE`` to the forecast modes, and
+    one that does not leaves it out.
     """
     schema_version = _required_string(metadata, "schema_version")
     if schema_version != SCHEMA_VERSION:
@@ -1801,7 +1824,7 @@ def validate_service_metadata(
     _require_advertised_subset(
         metadata,
         field="supported_query_modes",
-        supported_values=SUPPORTED_QUERY_MODES,
+        supported_values=KNOWN_QUERY_MODES,
         allow_empty=False,
     )
     _require_advertised_subset(
@@ -1815,10 +1838,11 @@ def validate_service_metadata(
         field="supported_return_modes",
         supported_values=SUPPORTED_RETURN_MODES,
     )
-    _require_exact_values(
+    _require_advertised_subset(
         metadata,
         field="supported_time_index_modes",
-        supported_values=SUPPORTED_TIME_INDEX_MODES,
+        supported_values=KNOWN_TIME_INDEX_MODES,
+        allow_empty=False,
     )
     _require_decoding_strategy(metadata.get("decoding_strategy"))
 

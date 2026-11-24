@@ -1,0 +1,71 @@
+{
+  "checkpoint_version": "table-1",
+  "diagnostics": {
+    "history_rows": 5,
+    "horizon_count": 3,
+    "seed": 3
+  },
+  "errors": [],
+  "head": "gmm",
+  "image_version": "0.2.0",
+  "model_version": "jointfm-serving:0.2.0+ckpt.table-1",
+  "outputs": {
+    "log_prob": null,
+    "mean": null,
+    "quantiles": [
+      {
+        "quantile": 0.1,
+        "values": [
+          [
+            null,
+            184.84286
+          ],
+          [
+            null,
+            184.50905
+          ],
+          [
+            1.568817,
+            182.42548
+          ]
+        ]
+      },
+      {
+        "quantile": 0.9,
+        "values": [
+          [
+            null,
+            481.1647
+          ],
+          [
+            null,
+            481.36
+          ],
+          [
+            4.950686,
+            483.1546
+          ]
+        ]
+      }
+    ],
+    "query_times": null,
+    "requested_columns": [
+      "rooms",
+      "price"
+    ],
+    "rows": {
+      "history_rows": [
+        1
+      ],
+      "query_rows": [
+        0,
+        1
+      ]
+    },
+    "samples": null
+  },
+  "plausibility": null,
+  "query_mode": "forecast",
+  "return_mode": "quantiles",
+  "schema_version": "v6"
+}
