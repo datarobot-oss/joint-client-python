@@ -18,9 +18,10 @@ The planner checks a notebook's desired ``(feature_columns, target_columns)``
 split against the data-generation envelope advertised by the deployment. That
 envelope caps the *total* number of series in one request rather than the two
 roles separately, so the planner validates the combined width against
-``min_series`` and ``max_series``, and the request shape against ``n_input``
-and ``n_output``, before anything is sent — callers then see a clear, local
-exception instead of a service-side validation error.
+``max_series``, and the request shape against ``n_input`` and ``n_output``,
+before anything is sent — callers then see a clear, local exception instead of
+a service-side refusal. ``min_series`` describes the training data and limits
+no request, so the planner admits any width from one column up.
 """
 
 from __future__ import annotations
@@ -59,8 +60,8 @@ def plan_forecast_columns(
 ) -> ForecastPlan:
     """Plan a forecast request that fits the deployment's data-generation envelope.
 
-    Raises :class:`JointFMCapacityError` when the combined column count falls
-    outside ``[min_series, max_series]``, when the caller passed no target
+    Raises :class:`JointFMCapacityError` when the combined column count
+    exceeds ``max_series``, when the caller passed no target
     column, when feature and target names overlap, or when the history length
     or horizon count exceeds capacity. ``n_input`` and ``n_output`` are the
     largest history window and forecast horizon the deployed model was trained
@@ -92,7 +93,6 @@ def plan_forecast_columns(
     _check_series_capacity(
         feature_list,
         target_list,
-        min_series=capacity.min_series,
         max_series=capacity.max_series,
     )
 
@@ -149,7 +149,6 @@ def _check_series_capacity(
     feature_list: Sequence[str],
     target_list: Sequence[str],
     *,
-    min_series: int,
     max_series: int,
 ) -> None:
     """Check the combined feature and target width against the series budget.
@@ -166,14 +165,6 @@ def _check_series_capacity(
             f"{series_count} ({len(feature_list)} feature(s) "
             f"{list(feature_list)!r} + {len(target_list)} target(s) "
             f"{list(target_list)!r}). Drop columns to fit the budget."
-        )
-    if series_count < min_series:
-        raise JointFMCapacityError(
-            f"Deployment requires at least min_series={min_series} series per "
-            f"request, counting features and targets together; got "
-            f"{series_count} ({len(feature_list)} feature(s) "
-            f"{list(feature_list)!r} + {len(target_list)} target(s) "
-            f"{list(target_list)!r})."
         )
 
 

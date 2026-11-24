@@ -767,11 +767,13 @@ class DataGenerationCapabilities:
     """Training-time data-generation envelope advertised by the deployment.
 
     Mirrors the inference service's ``data_generation`` health block.
-    ``min_series`` and ``max_series`` bound the *total* width of one request —
-    feature and target columns counted together — because training draws that
-    total and then splits it randomly, guaranteeing only that at least one
-    column is a target. There is therefore no separate per-role cap: a request
-    is admissible on width alone. ``n_input`` is the longest history and
+    ``max_series`` bounds the *total* width of one request — feature and
+    target columns counted together — because training draws that total and
+    then splits it randomly, guaranteeing only that at least one column is a
+    target. There is therefore no separate per-role cap: a request is
+    admissible on width alone. ``min_series`` is the fewest columns a training
+    sample carried; it describes the training data and limits no request,
+    since one column is enough. ``n_input`` is the longest history and
     ``n_output`` the longest forecast horizon the deployment was trained to
     handle; both are upper bounds, and smaller requests are accepted.
     ``t_input`` and ``t_output`` are the simulated time spans of that history
@@ -790,7 +792,8 @@ class DataGenerationCapabilities:
         """Parse one ``data_generation`` block from a `/healthz` payload.
 
         Raises ``ValueError`` when a field is missing or malformed, or when the
-        series bounds are inverted — an envelope no request could satisfy.
+        series bounds are inverted — an envelope no training sample could have
+        met.
         """
         min_series = _require_positive_int(
             payload.get("min_series"),

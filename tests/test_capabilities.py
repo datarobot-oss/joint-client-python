@@ -243,10 +243,10 @@ def test_plan_forecast_columns_raises_when_data_generation_missing(
         )
 
 
-def test_plan_forecast_columns_enforces_min_series(
+def test_plan_forecast_columns_admits_fewer_columns_than_min_series(
     json_fixture_loader: Callable[[str], dict[str, Any]],
 ) -> None:
-    """A request narrower than the deployment's minimum width is rejected."""
+    """``min_series`` describes the training data, so one target column plans."""
     health = _health(
         json_fixture_loader,
         data_generation={
@@ -259,14 +259,15 @@ def test_plan_forecast_columns_enforces_min_series(
         },
     )
 
-    with pytest.raises(JointFMCapacityError, match="min_series=4"):
-        plan_forecast_columns(
-            health=health,
-            feature_columns=["a", "b"],
-            target_columns=["c"],
-            history_length=100,
-            query_times_length=10,
-        )
+    plan = plan_forecast_columns(
+        health=health,
+        feature_columns=[],
+        target_columns=["c"],
+        history_length=100,
+        query_times_length=10,
+    )
+
+    assert plan.columns == (ColumnSpec(name="c", modality="numeric", role="target"),)
 
 
 def test_plan_forecast_columns_rejects_duplicate_column_names(
