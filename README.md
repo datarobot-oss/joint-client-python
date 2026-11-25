@@ -186,7 +186,7 @@ print(health.supported_time_index_modes, health.time_index_encoding)
 - Distribution package: `jointfm-client`
 - Import namespace: `jointfm_client`
 - Supported Python: `>=3.11`
-- Current SDK package version: `0.16.2`
+- Current SDK package version: `0.17.0`
 - Current JointFM service schema: `schema_version="v6"`
 
 The public API shape is a synchronous low-level `JointFMClient` with `health()`, `health_instances()`, and `predict(payload)` methods plus high-level `forecast(...)`, `forecast_mean(...)`, `forecast_samples(...)`, `forecast_quantiles(...)`, `forecast_log_prob(...)`, `predict_table(...)`, and `feature_importance(...)` helpers. The SDK is not a proxy service; callers use it as a local Python library that talks to the hosted or local JointFM endpoint.

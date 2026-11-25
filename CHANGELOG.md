@@ -10,6 +10,17 @@ Releases are cut with `task release`, which uses Commitizen to read
 release tag, infer the next SemVer bump, prepend the new section here,
 commit the bump, and create an annotated tag.
 
+## v0.17.0 (2026-11-25)
+
+### Feat
+
+- Keep working with every newer deployment of the same schema_version by passing advertised query modes, condition kinds, return modes, time index modes, and decoding strategies the client does not know instead of refusing the deployment at its health check, which now refuses only another schema_version, a model version mismatch, or a missing or malformed field, while the condition, table, and expert-hint gates still refuse a call before sending and the service refuses any other unserved mode; read precision, tail_map, max_request_bytes, and sample_row_draws in HealthMetadata and requested and allowed in StructuredError, each None from a deployment that does not send it; ship the runner's OpenAPI document as package data, copied by task contract:sync from the runner release RUNNER_VERSION names and returned by openapi_document(), and add unknown_contract_terms(document), which names every health field, error field, error code, or advertised mode of a service's document that the client does not read; capture every fixture from a running service with task fixtures:capture, which checks each answer against the document, replaces versions and the checkpoint path by placeholders, and runs the leak guard, keep one fixture directory per service, add request fixtures for the two missing condition modes, a two-column interval condition, and the four refusals, read the numbers tests assert from the captured fixtures, and fail test_wire_contract.py when a fixture is not a body the document describes or the document lists a term the client does not read; split contract.py into a contract package grouped by concern; and document the compatibility rule, the new fields and functions, and how to follow a runner release in the README, the API reference, AGENTS.md, and CONTRIBUTING.md
+- Send tables with JointFMClient.predict_table, build_table_payload, and build_table_payload_from_dataframe, which list context rows and query rows and name the cells to predict in requested_cells whatever their columns' roles, and parse their answers into TableMeanResult, TableSampleResult, TableQuantileResult, and TableLogProbResult, refusing a deployment without the unordered time index mode before the round trip (require_table_support), accept health metadata that advertises a subset of KNOWN_TIME_INDEX_MODES and KNOWN_QUERY_MODES, the complete query mode included, instead of requiring the exact lists, so the client no longer refuses the health of a deployment that answers tables or completions, test both with fixtures captured from a running service, and document tables in the README's Predictive Modes section and the API reference
+
+### Fix
+
+- Stop refusing a forecast plan with fewer columns than min_series in plan_forecast_columns, because min_series is the fewest columns a training sample carried and limits no request, so any width from one column up to max_series plans, and say so in DataGenerationCapabilities and the API reference
+
 ## v0.16.2 (2026-11-21)
 
 ## v0.16.1 (2026-11-20)
