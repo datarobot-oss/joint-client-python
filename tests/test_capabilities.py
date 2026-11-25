@@ -31,33 +31,32 @@ from jointfm_client import (
 )
 
 
+# The envelope the planning tests reason about, independent of the captured
+# health fixture, whose envelope is the tiny test checkpoint's.
+_ENVELOPE: Mapping[str, Any] = {
+    "min_series": 1,
+    "max_series": 16,
+    "t_input": 10.0,
+    "t_output": 3.0,
+    "n_input": 100,
+    "n_output": 10,
+}
+
+
 def _capabilities(**overrides: Any) -> DataGenerationCapabilities:
     """Build a permissive capabilities object that tests override per case."""
-    defaults: dict[str, Any] = {
-        "min_series": 1,
-        "max_series": 16,
-        "t_input": 10.0,
-        "t_output": 3.0,
-        "n_input": 100,
-        "n_output": 10,
-    }
-    defaults.update(overrides)
-    return DataGenerationCapabilities(**defaults)
+    return DataGenerationCapabilities(**{**_ENVELOPE, **overrides})
 
 
 def _health(
     json_fixture_loader: Callable[[str], dict[str, Any]],
     *,
-    data_generation: Mapping[str, Any] | None | str = "default",
+    data_generation: Mapping[str, Any] | None = _ENVELOPE,
 ) -> HealthMetadata:
-    """Build a HealthMetadata from the shared fixture with optional override."""
-    payload = json_fixture_loader("health_metadata")
-    if data_generation == "default":
-        return HealthMetadata.from_payload(payload)
+    """Build a HealthMetadata from the captured health with the given envelope."""
+    payload = json_fixture_loader("jointfm_1/health_metadata")
     payload["data_generation"] = (
-        dict(data_generation)
-        if isinstance(data_generation, Mapping)
-        else data_generation
+        None if data_generation is None else dict(data_generation)
     )
     return HealthMetadata.from_payload(payload)
 
@@ -66,18 +65,21 @@ def test_health_metadata_parses_data_generation_block(
     json_fixture_loader: Callable[[str], dict[str, Any]],
 ) -> None:
     """Health metadata parses data generation block."""
-    health = HealthMetadata.from_payload(json_fixture_loader("health_metadata"))
+    payload = json_fixture_loader("jointfm_1/health_metadata")
+    health = HealthMetadata.from_payload(payload)
 
-    assert health.max_sample_count == 4096
+    assert health.max_sample_count == payload["max_sample_count"]
     assert health.decoding_strategy == "parallel_dense"
-    assert health.data_generation == _capabilities()
+    assert health.data_generation == DataGenerationCapabilities(
+        **payload["data_generation"]
+    )
 
 
 def test_health_metadata_accepts_null_data_generation(
     json_fixture_loader: Callable[[str], dict[str, Any]],
 ) -> None:
     """Health metadata accepts null data generation."""
-    payload = json_fixture_loader("health_metadata")
+    payload = json_fixture_loader("jointfm_1/health_metadata")
     payload["data_generation"] = None
 
     health = HealthMetadata.from_payload(payload)

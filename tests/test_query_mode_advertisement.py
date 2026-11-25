@@ -17,8 +17,8 @@
 A JointFM 2 deployment that reads ordered rows also answers completions and
 advertises ``complete`` in ``supported_query_modes``. The client reads that
 advertisement, so its health check passes, while every request it builds
-stays a forecast or a condition query. The ``jointfm_2_*health_metadata``
-fixtures are the health payloads of two JointFM 2 deployments: one that
+stays a forecast or a condition query. The health fixtures under
+``jointfm_2/`` are the health payloads of two JointFM 2 deployments: one that
 answers tables and one that reads ordered rows alone.
 """
 
@@ -31,16 +31,18 @@ import pytest
 
 from jointfm_client import (
     COMPLETE_QUERY_MODE,
+    EqualityCondition,
     ForecastRequestMetadata,
     HealthMetadata,
     UnsupportedServiceContractError,
+    require_condition_support,
     validate_service_metadata,
 )
 from jointfm_client.contract import QueryMode
 
 _HEALTH_FIXTURES = (
-    "jointfm_2_health_metadata",
-    "jointfm_2_ordered_health_metadata",
+    "jointfm_2/health_metadata",
+    "jointfm_2/ordered_health_metadata",
 )
 
 
@@ -58,15 +60,21 @@ def test_a_deployment_that_answers_completions_passes_the_health_check(
     assert COMPLETE_QUERY_MODE in parsed.supported_query_modes
 
 
-def test_a_query_mode_the_client_does_not_know_is_refused(
+def test_a_query_mode_the_client_does_not_know_passes_and_the_call_gate_refuses(
     json_fixture_loader: Callable[[str], dict[str, Any]],
 ) -> None:
-    """Accepting ``complete`` keeps the subset check for modes newer than this client."""
-    health = json_fixture_loader("jointfm_2_ordered_health_metadata")
+    """A mode newer than this client passes health; a call needing an unadvertised mode is refused."""
+    health = json_fixture_loader("jointfm_2/ordered_health_metadata")
     health["supported_query_modes"] = ["forecast", "explain"]
 
-    with pytest.raises(UnsupportedServiceContractError, match="explain"):
-        validate_service_metadata(health)
+    validate_service_metadata(health)
+    parsed = HealthMetadata.from_payload(health)
+
+    assert parsed.supported_query_modes == ("forecast", "explain")
+    with pytest.raises(
+        UnsupportedServiceContractError, match="does not serve condition"
+    ):
+        require_condition_support(parsed, EqualityCondition(column="driver", value=1.0))
 
 
 def test_the_client_never_sends_a_completion() -> None:

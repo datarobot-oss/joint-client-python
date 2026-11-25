@@ -1,0 +1,10 @@
+{
+  "errors": [
+    {
+      "code": "SCHEMA_VERSION_MISMATCH",
+      "field": "schema_version",
+      "message": "Unsupported schema_version: expected 'v6', got 'v4'"
+    }
+  ],
+  "schema_version": "v6"
+}

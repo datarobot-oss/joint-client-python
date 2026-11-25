@@ -414,18 +414,20 @@ def test_the_equality_response_reads_back_its_plausibility(
     json_fixture_loader: Callable[[str], dict[str, Any]],
 ) -> None:
     """The density of the pinned values is what separates confident from absurd."""
-    request_payload = json_fixture_loader("condition_mean_request")
-    response = ForecastResponse.from_payload(
-        json_fixture_loader("condition_mean_response"),
-        request_payload=request_payload,
-    )
+    request_payload = json_fixture_loader("jointfm_1/condition_mean_request")
+    payload = json_fixture_loader("jointfm_1/condition_mean_response")
+    response = ForecastResponse.from_payload(payload, request_payload=request_payload)
 
     assert response.query_mode == "condition"
     assert response.plausibility == ConditionPlausibility(
-        equality_log_density=-1.27,
+        equality_log_density=payload["plausibility"]["equality_log_density"],
         region_log_probability=None,
     )
-    assert response.diagnostics.condition_draws == 500
+    assert response.plausibility.equality_log_density is not None
+    assert (
+        response.diagnostics.condition_draws
+        == payload["diagnostics"]["condition_draws"]
+    )
     assert response.diagnostics.interval_estimator is None
 
 
@@ -433,12 +435,12 @@ def test_the_response_answers_every_requested_position(
     json_fixture_loader: Callable[[str], dict[str, Any]],
 ) -> None:
     """The condition covers one of two rows, and the answer still carries both."""
-    request_payload = json_fixture_loader("condition_mean_request")
+    request_payload = json_fixture_loader("jointfm_1/condition_mean_request")
     assert request_payload["query_times"] == [2, 3]
     assert request_payload["conditions"][0]["query_time_indices"] == [1]
 
     response = ForecastResponse.from_payload(
-        json_fixture_loader("condition_mean_response"),
+        json_fixture_loader("jointfm_1/condition_mean_response"),
         request_payload=request_payload,
     )
 
@@ -450,7 +452,7 @@ def test_a_response_narrowed_to_the_covered_position_is_refused(
     json_fixture_loader: Callable[[str], dict[str, Any]],
 ) -> None:
     """A deployment answering fewer positions than asked must fail, not parse."""
-    response_payload = json_fixture_loader("condition_mean_response")
+    response_payload = json_fixture_loader("jointfm_1/condition_mean_response")
     response_payload["outputs"]["query_times"] = [3]
     response_payload["outputs"]["mean"] = [[13.5]]
     response_payload["diagnostics"]["horizon_count"] = 1
@@ -458,7 +460,7 @@ def test_a_response_narrowed_to_the_covered_position_is_refused(
     with pytest.raises(ValueError, match="query_times"):
         ForecastResponse.from_payload(
             response_payload,
-            request_payload=json_fixture_loader("condition_mean_request"),
+            request_payload=json_fixture_loader("jointfm_1/condition_mean_request"),
         )
 
 
@@ -466,18 +468,24 @@ def test_an_interval_response_reads_back_its_estimator_accuracy(
     json_fixture_loader: Callable[[str], dict[str, Any]],
 ) -> None:
     """A multi-column region is estimated, and the caller judges the estimate itself."""
+    payload = json_fixture_loader("jointfm_1/condition_interval_response")
     response = ForecastResponse.from_payload(
-        json_fixture_loader("condition_interval_response"),
-        request_payload=json_fixture_loader("condition_mean_request"),
+        payload,
+        request_payload=json_fixture_loader("jointfm_1/condition_interval_request"),
     )
 
     assert response.plausibility is not None
     assert response.plausibility.equality_log_density is None
-    assert response.plausibility.region_log_probability == pytest.approx(-8.91)
+    assert response.plausibility.region_log_probability == pytest.approx(
+        payload["plausibility"]["region_log_probability"]
+    )
+    sent = payload["diagnostics"]["interval_estimator"]
     estimator = response.diagnostics.interval_estimator
     assert estimator is not None
-    assert estimator.points == 16384
-    assert estimator.effective_sample_size == pytest.approx(11453.2)
+    assert estimator.points == sent["points"]
+    assert estimator.effective_sample_size == pytest.approx(
+        sent["effective_sample_size"]
+    )
 
 
 class _ConditionTransport:
@@ -599,12 +607,13 @@ def test_the_client_sends_the_condition_and_reads_the_answer_back(
     json_fixture_loader: Callable[[str], dict[str, Any]],
 ) -> None:
     """The typed helper carries the condition onto the wire and types what comes back."""
+    answer = json_fixture_loader("jointfm_1/condition_mean_response")
     transport = _ConditionTransport(
         health_payload=_health_payload(
             query_modes=["forecast", "condition"],
             condition_kinds=["equality", "interval"],
         ),
-        predict_payload=json_fixture_loader("condition_mean_response"),
+        predict_payload=answer,
     )
 
     result = _client(transport).forecast_mean(
@@ -620,8 +629,10 @@ def test_the_client_sends_the_condition_and_reads_the_answer_back(
     assert isinstance(result, MeanForecastResult)
     assert result.query_mode == "condition"
     assert result.query_times == (2, 3)
-    np.testing.assert_array_equal(result.mean, ((12.0,), (13.5,)))
-    assert result.plausibility == ConditionPlausibility(equality_log_density=-1.27)
+    np.testing.assert_array_equal(result.mean, answer["outputs"]["mean"])
+    assert result.plausibility == ConditionPlausibility(
+        equality_log_density=answer["plausibility"]["equality_log_density"]
+    )
     assert len(transport.payloads) == 1
     sent = transport.payloads[0]
     assert sent["query_mode"] == "condition"
@@ -711,22 +722,15 @@ def test_the_dataframe_adapter_builds_a_condition_request() -> None:
     assert payload["requested_columns"] == ["target"]
 
 
-@pytest.mark.parametrize(
-    ("field", "advertised", "message"),
-    [
-        ("supported_query_modes", [], "advertises nothing"),
-        ("supported_condition_kinds", ["parametric"], "does not know"),
-    ],
-)
-def test_metadata_validation_rejects_an_advertisement_this_client_cannot_serve(
-    field: str, advertised: list[str], message: str
-) -> None:
-    """Fewer capabilities than the SDK knows are fine; none, or unknown ones, are not."""
+def test_metadata_validation_rejects_a_deployment_that_advertises_no_query_mode() -> (
+    None
+):
+    """Fewer query modes than the SDK knows are fine; none means nothing is served."""
     payload = _health_payload(
         query_modes=["forecast", "condition"],
         condition_kinds=["equality", "interval"],
     )
-    payload[field] = advertised
+    payload["supported_query_modes"] = []
 
-    with pytest.raises(UnsupportedServiceContractError, match=message):
+    with pytest.raises(UnsupportedServiceContractError, match="advertises nothing"):
         validate_service_metadata(payload, expected_model_version=_MODEL_VERSION)

@@ -1,0 +1,10 @@
+{
+  "errors": [
+    {
+      "code": "MODEL_VERSION_MISMATCH",
+      "field": "model_version",
+      "message": "Unsupported model_version: expected 'jointfm-inference:0.3.0+ckpt.sdk-test', got 'jointfm-inference:9.9.9+ckpt.other'"
+    }
+  ],
+  "schema_version": "v6"
+}

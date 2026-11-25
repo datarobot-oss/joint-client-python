@@ -1,0 +1,2621 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "JointFM inference service",
+    "version": "v6",
+    "description": "The HTTP contract of a `jointfm-inference` service. `GET /healthz` reports what the service serves and the limits a request must keep; `POST /predict` answers forecast and condition queries over one table of rows. Every prediction request names the contract version in `schema_version`, and this document describes the version in `info.version`. An unknown path answers 404 with an `ErrorResponse`.\n\nThe service generates this document from its own code (`jointfm-inference schema`)."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8080",
+      "description": "A local service on its default port."
+    }
+  ],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "operationId": "health",
+        "summary": "Report what the service serves",
+        "responses": {
+          "200": {
+            "description": "The service is ready.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/predict": {
+      "post": {
+        "operationId": "predict",
+        "summary": "Answer a forecast or condition query",
+        "description": "Answers a `PredictRequest` with a `PredictResponse`, and a `HealthRequest` with the `HealthResponse` of `GET /healthz`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Request"
+              },
+              "examples": {
+                "forecast_mean": {
+                  "summary": "`forecast` query, `mean` answer",
+                  "value": {
+                    "schema_version": "v6",
+                    "time_index_mode": "absolute_datetime",
+                    "time_column": "timestamp",
+                    "columns": [
+                      {
+                        "name": "temperature",
+                        "modality": "numeric",
+                        "role": "feature"
+                      },
+                      {
+                        "name": "demand",
+                        "modality": "numeric",
+                        "role": "target",
+                        "lower_bound": 0.0
+                      }
+                    ],
+                    "history_rows": [
+                      {
+                        "timestamp": "2026-01-01T00:00:00Z",
+                        "temperature": 3.1,
+                        "demand": 41.0
+                      },
+                      {
+                        "timestamp": "2026-01-02T00:00:00Z",
+                        "temperature": 2.4,
+                        "demand": 44.5
+                      },
+                      {
+                        "timestamp": "2026-01-03T00:00:00Z",
+                        "temperature": 1.8,
+                        "demand": 47.2
+                      },
+                      {
+                        "timestamp": "2026-01-04T00:00:00Z",
+                        "temperature": 2.9,
+                        "demand": 43.1
+                      },
+                      {
+                        "timestamp": "2026-01-05T00:00:00Z",
+                        "temperature": 3.6,
+                        "demand": 39.8
+                      },
+                      {
+                        "timestamp": "2026-01-06T00:00:00Z",
+                        "temperature": 4.0,
+                        "demand": 38.6
+                      },
+                      {
+                        "timestamp": "2026-01-07T00:00:00Z",
+                        "temperature": 3.2,
+                        "demand": 40.9
+                      },
+                      {
+                        "timestamp": "2026-01-08T00:00:00Z",
+                        "temperature": 2.7,
+                        "demand": 42.3
+                      }
+                    ],
+                    "query_times": [
+                      "2026-01-09T00:00:00Z",
+                      "2026-01-10T00:00:00Z",
+                      "2026-01-11T00:00:00Z"
+                    ],
+                    "seed": 7,
+                    "query_mode": "forecast",
+                    "return_mode": "mean",
+                    "requested_columns": [
+                      "demand"
+                    ]
+                  }
+                },
+                "forecast_samples": {
+                  "summary": "`forecast` query, `samples` answer",
+                  "value": {
+                    "schema_version": "v6",
+                    "time_index_mode": "absolute_datetime",
+                    "time_column": "timestamp",
+                    "columns": [
+                      {
+                        "name": "temperature",
+                        "modality": "numeric",
+                        "role": "feature"
+                      },
+                      {
+                        "name": "demand",
+                        "modality": "numeric",
+                        "role": "target",
+                        "lower_bound": 0.0
+                      }
+                    ],
+                    "history_rows": [
+                      {
+                        "timestamp": "2026-01-01T00:00:00Z",
+                        "temperature": 3.1,
+                        "demand": 41.0
+                      },
+                      {
+                        "timestamp": "2026-01-02T00:00:00Z",
+                        "temperature": 2.4,
+                        "demand": 44.5
+                      },
+                      {
+                        "timestamp": "2026-01-03T00:00:00Z",
+                        "temperature": 1.8,
+                        "demand": 47.2
+                      },
+                      {
+                        "timestamp": "2026-01-04T00:00:00Z",
+                        "temperature": 2.9,
+                        "demand": 43.1
+                      },
+                      {
+                        "timestamp": "2026-01-05T00:00:00Z",
+                        "temperature": 3.6,
+                        "demand": 39.8
+                      },
+                      {
+                        "timestamp": "2026-01-06T00:00:00Z",
+                        "temperature": 4.0,
+                        "demand": 38.6
+                      },
+                      {
+                        "timestamp": "2026-01-07T00:00:00Z",
+                        "temperature": 3.2,
+                        "demand": 40.9
+                      },
+                      {
+                        "timestamp": "2026-01-08T00:00:00Z",
+                        "temperature": 2.7,
+                        "demand": 42.3
+                      }
+                    ],
+                    "query_times": [
+                      "2026-01-09T00:00:00Z",
+                      "2026-01-10T00:00:00Z",
+                      "2026-01-11T00:00:00Z"
+                    ],
+                    "seed": 7,
+                    "query_mode": "forecast",
+                    "return_mode": "samples",
+                    "requested_columns": [
+                      "demand"
+                    ],
+                    "n_samples": 4
+                  }
+                },
+                "forecast_quantiles": {
+                  "summary": "`forecast` query, `quantiles` answer",
+                  "value": {
+                    "schema_version": "v6",
+                    "time_index_mode": "absolute_datetime",
+                    "time_column": "timestamp",
+                    "columns": [
+                      {
+                        "name": "temperature",
+                        "modality": "numeric",
+                        "role": "feature"
+                      },
+                      {
+                        "name": "demand",
+                        "modality": "numeric",
+                        "role": "target",
+                        "lower_bound": 0.0
+                      }
+                    ],
+                    "history_rows": [
+                      {
+                        "timestamp": "2026-01-01T00:00:00Z",
+                        "temperature": 3.1,
+                        "demand": 41.0
+                      },
+                      {
+                        "timestamp": "2026-01-02T00:00:00Z",
+                        "temperature": 2.4,
+                        "demand": 44.5
+                      },
+                      {
+                        "timestamp": "2026-01-03T00:00:00Z",
+                        "temperature": 1.8,
+                        "demand": 47.2
+                      },
+                      {
+                        "timestamp": "2026-01-04T00:00:00Z",
+                        "temperature": 2.9,
+                        "demand": 43.1
+                      },
+                      {
+                        "timestamp": "2026-01-05T00:00:00Z",
+                        "temperature": 3.6,
+                        "demand": 39.8
+                      },
+                      {
+                        "timestamp": "2026-01-06T00:00:00Z",
+                        "temperature": 4.0,
+                        "demand": 38.6
+                      },
+                      {
+                        "timestamp": "2026-01-07T00:00:00Z",
+                        "temperature": 3.2,
+                        "demand": 40.9
+                      },
+                      {
+                        "timestamp": "2026-01-08T00:00:00Z",
+                        "temperature": 2.7,
+                        "demand": 42.3
+                      }
+                    ],
+                    "query_times": [
+                      "2026-01-09T00:00:00Z",
+                      "2026-01-10T00:00:00Z",
+                      "2026-01-11T00:00:00Z"
+                    ],
+                    "seed": 7,
+                    "query_mode": "forecast",
+                    "return_mode": "quantiles",
+                    "requested_columns": [
+                      "demand"
+                    ],
+                    "quantiles": [
+                      0.1,
+                      0.5,
+                      0.9
+                    ]
+                  }
+                },
+                "forecast_log_prob": {
+                  "summary": "`forecast` query, `log_prob` answer",
+                  "value": {
+                    "schema_version": "v6",
+                    "time_index_mode": "absolute_datetime",
+                    "time_column": "timestamp",
+                    "columns": [
+                      {
+                        "name": "temperature",
+                        "modality": "numeric",
+                        "role": "feature"
+                      },
+                      {
+                        "name": "demand",
+                        "modality": "numeric",
+                        "role": "target",
+                        "lower_bound": 0.0
+                      }
+                    ],
+                    "history_rows": [
+                      {
+                        "timestamp": "2026-01-01T00:00:00Z",
+                        "temperature": 3.1,
+                        "demand": 41.0
+                      },
+                      {
+                        "timestamp": "2026-01-02T00:00:00Z",
+                        "temperature": 2.4,
+                        "demand": 44.5
+                      },
+                      {
+                        "timestamp": "2026-01-03T00:00:00Z",
+                        "temperature": 1.8,
+                        "demand": 47.2
+                      },
+                      {
+                        "timestamp": "2026-01-04T00:00:00Z",
+                        "temperature": 2.9,
+                        "demand": 43.1
+                      },
+                      {
+                        "timestamp": "2026-01-05T00:00:00Z",
+                        "temperature": 3.6,
+                        "demand": 39.8
+                      },
+                      {
+                        "timestamp": "2026-01-06T00:00:00Z",
+                        "temperature": 4.0,
+                        "demand": 38.6
+                      },
+                      {
+                        "timestamp": "2026-01-07T00:00:00Z",
+                        "temperature": 3.2,
+                        "demand": 40.9
+                      },
+                      {
+                        "timestamp": "2026-01-08T00:00:00Z",
+                        "temperature": 2.7,
+                        "demand": 42.3
+                      }
+                    ],
+                    "query_times": [
+                      "2026-01-09T00:00:00Z",
+                      "2026-01-10T00:00:00Z",
+                      "2026-01-11T00:00:00Z"
+                    ],
+                    "seed": 7,
+                    "query_mode": "forecast",
+                    "return_mode": "log_prob",
+                    "query_rows": [
+                      {
+                        "timestamp": "2026-01-09T00:00:00Z",
+                        "temperature": 1.5,
+                        "demand": 46.0
+                      },
+                      {
+                        "timestamp": "2026-01-10T00:00:00Z",
+                        "temperature": 2.2,
+                        "demand": 44.1
+                      },
+                      {
+                        "timestamp": "2026-01-11T00:00:00Z",
+                        "temperature": 3.0,
+                        "demand": 41.7
+                      }
+                    ]
+                  }
+                },
+                "condition_mean": {
+                  "summary": "`condition` query, `mean` answer",
+                  "value": {
+                    "schema_version": "v6",
+                    "time_index_mode": "absolute_datetime",
+                    "time_column": "timestamp",
+                    "columns": [
+                      {
+                        "name": "temperature",
+                        "modality": "numeric",
+                        "role": "feature"
+                      },
+                      {
+                        "name": "demand",
+                        "modality": "numeric",
+                        "role": "target",
+                        "lower_bound": 0.0
+                      }
+                    ],
+                    "history_rows": [
+                      {
+                        "timestamp": "2026-01-01T00:00:00Z",
+                        "temperature": 3.1,
+                        "demand": 41.0
+                      },
+                      {
+                        "timestamp": "2026-01-02T00:00:00Z",
+                        "temperature": 2.4,
+                        "demand": 44.5
+                      },
+                      {
+                        "timestamp": "2026-01-03T00:00:00Z",
+                        "temperature": 1.8,
+                        "demand": 47.2
+                      },
+                      {
+                        "timestamp": "2026-01-04T00:00:00Z",
+                        "temperature": 2.9,
+                        "demand": 43.1
+                      },
+                      {
+                        "timestamp": "2026-01-05T00:00:00Z",
+                        "temperature": 3.6,
+                        "demand": 39.8
+                      },
+                      {
+                        "timestamp": "2026-01-06T00:00:00Z",
+                        "temperature": 4.0,
+                        "demand": 38.6
+                      },
+                      {
+                        "timestamp": "2026-01-07T00:00:00Z",
+                        "temperature": 3.2,
+                        "demand": 40.9
+                      },
+                      {
+                        "timestamp": "2026-01-08T00:00:00Z",
+                        "temperature": 2.7,
+                        "demand": 42.3
+                      }
+                    ],
+                    "query_times": [
+                      "2026-01-09T00:00:00Z",
+                      "2026-01-10T00:00:00Z",
+                      "2026-01-11T00:00:00Z"
+                    ],
+                    "seed": 7,
+                    "query_mode": "condition",
+                    "return_mode": "mean",
+                    "requested_columns": [
+                      "demand"
+                    ],
+                    "conditions": [
+                      {
+                        "column": "temperature",
+                        "kind": "equality",
+                        "value": 1.5,
+                        "query_time_indices": [
+                          0
+                        ]
+                      },
+                      {
+                        "column": "temperature",
+                        "kind": "interval",
+                        "lower": 0.0,
+                        "upper": null,
+                        "query_time_indices": [
+                          1,
+                          2
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "condition_samples": {
+                  "summary": "`condition` query, `samples` answer",
+                  "value": {
+                    "schema_version": "v6",
+                    "time_index_mode": "absolute_datetime",
+                    "time_column": "timestamp",
+                    "columns": [
+                      {
+                        "name": "temperature",
+                        "modality": "numeric",
+                        "role": "feature"
+                      },
+                      {
+                        "name": "demand",
+                        "modality": "numeric",
+                        "role": "target",
+                        "lower_bound": 0.0
+                      }
+                    ],
+                    "history_rows": [
+                      {
+                        "timestamp": "2026-01-01T00:00:00Z",
+                        "temperature": 3.1,
+                        "demand": 41.0
+                      },
+                      {
+                        "timestamp": "2026-01-02T00:00:00Z",
+                        "temperature": 2.4,
+                        "demand": 44.5
+                      },
+                      {
+                        "timestamp": "2026-01-03T00:00:00Z",
+                        "temperature": 1.8,
+                        "demand": 47.2
+                      },
+                      {
+                        "timestamp": "2026-01-04T00:00:00Z",
+                        "temperature": 2.9,
+                        "demand": 43.1
+                      },
+                      {
+                        "timestamp": "2026-01-05T00:00:00Z",
+                        "temperature": 3.6,
+                        "demand": 39.8
+                      },
+                      {
+                        "timestamp": "2026-01-06T00:00:00Z",
+                        "temperature": 4.0,
+                        "demand": 38.6
+                      },
+                      {
+                        "timestamp": "2026-01-07T00:00:00Z",
+                        "temperature": 3.2,
+                        "demand": 40.9
+                      },
+                      {
+                        "timestamp": "2026-01-08T00:00:00Z",
+                        "temperature": 2.7,
+                        "demand": 42.3
+                      }
+                    ],
+                    "query_times": [
+                      "2026-01-09T00:00:00Z",
+                      "2026-01-10T00:00:00Z",
+                      "2026-01-11T00:00:00Z"
+                    ],
+                    "seed": 7,
+                    "query_mode": "condition",
+                    "return_mode": "samples",
+                    "requested_columns": [
+                      "demand"
+                    ],
+                    "n_samples": 4,
+                    "conditions": [
+                      {
+                        "column": "temperature",
+                        "kind": "equality",
+                        "value": 1.5,
+                        "query_time_indices": [
+                          0
+                        ]
+                      },
+                      {
+                        "column": "temperature",
+                        "kind": "interval",
+                        "lower": 0.0,
+                        "upper": null,
+                        "query_time_indices": [
+                          1,
+                          2
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "condition_quantiles": {
+                  "summary": "`condition` query, `quantiles` answer",
+                  "value": {
+                    "schema_version": "v6",
+                    "time_index_mode": "absolute_datetime",
+                    "time_column": "timestamp",
+                    "columns": [
+                      {
+                        "name": "temperature",
+                        "modality": "numeric",
+                        "role": "feature"
+                      },
+                      {
+                        "name": "demand",
+                        "modality": "numeric",
+                        "role": "target",
+                        "lower_bound": 0.0
+                      }
+                    ],
+                    "history_rows": [
+                      {
+                        "timestamp": "2026-01-01T00:00:00Z",
+                        "temperature": 3.1,
+                        "demand": 41.0
+                      },
+                      {
+                        "timestamp": "2026-01-02T00:00:00Z",
+                        "temperature": 2.4,
+                        "demand": 44.5
+                      },
+                      {
+                        "timestamp": "2026-01-03T00:00:00Z",
+                        "temperature": 1.8,
+                        "demand": 47.2
+                      },
+                      {
+                        "timestamp": "2026-01-04T00:00:00Z",
+                        "temperature": 2.9,
+                        "demand": 43.1
+                      },
+                      {
+                        "timestamp": "2026-01-05T00:00:00Z",
+                        "temperature": 3.6,
+                        "demand": 39.8
+                      },
+                      {
+                        "timestamp": "2026-01-06T00:00:00Z",
+                        "temperature": 4.0,
+                        "demand": 38.6
+                      },
+                      {
+                        "timestamp": "2026-01-07T00:00:00Z",
+                        "temperature": 3.2,
+                        "demand": 40.9
+                      },
+                      {
+                        "timestamp": "2026-01-08T00:00:00Z",
+                        "temperature": 2.7,
+                        "demand": 42.3
+                      }
+                    ],
+                    "query_times": [
+                      "2026-01-09T00:00:00Z",
+                      "2026-01-10T00:00:00Z",
+                      "2026-01-11T00:00:00Z"
+                    ],
+                    "seed": 7,
+                    "query_mode": "condition",
+                    "return_mode": "quantiles",
+                    "requested_columns": [
+                      "demand"
+                    ],
+                    "quantiles": [
+                      0.1,
+                      0.5,
+                      0.9
+                    ],
+                    "conditions": [
+                      {
+                        "column": "temperature",
+                        "kind": "equality",
+                        "value": 1.5,
+                        "query_time_indices": [
+                          0
+                        ]
+                      },
+                      {
+                        "column": "temperature",
+                        "kind": "interval",
+                        "lower": 0.0,
+                        "upper": null,
+                        "query_time_indices": [
+                          1,
+                          2
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "condition_log_prob": {
+                  "summary": "`condition` query, `log_prob` answer",
+                  "value": {
+                    "schema_version": "v6",
+                    "time_index_mode": "absolute_datetime",
+                    "time_column": "timestamp",
+                    "columns": [
+                      {
+                        "name": "temperature",
+                        "modality": "numeric",
+                        "role": "feature"
+                      },
+                      {
+                        "name": "demand",
+                        "modality": "numeric",
+                        "role": "target",
+                        "lower_bound": 0.0
+                      }
+                    ],
+                    "history_rows": [
+                      {
+                        "timestamp": "2026-01-01T00:00:00Z",
+                        "temperature": 3.1,
+                        "demand": 41.0
+                      },
+                      {
+                        "timestamp": "2026-01-02T00:00:00Z",
+                        "temperature": 2.4,
+                        "demand": 44.5
+                      },
+                      {
+                        "timestamp": "2026-01-03T00:00:00Z",
+                        "temperature": 1.8,
+                        "demand": 47.2
+                      },
+                      {
+                        "timestamp": "2026-01-04T00:00:00Z",
+                        "temperature": 2.9,
+                        "demand": 43.1
+                      },
+                      {
+                        "timestamp": "2026-01-05T00:00:00Z",
+                        "temperature": 3.6,
+                        "demand": 39.8
+                      },
+                      {
+                        "timestamp": "2026-01-06T00:00:00Z",
+                        "temperature": 4.0,
+                        "demand": 38.6
+                      },
+                      {
+                        "timestamp": "2026-01-07T00:00:00Z",
+                        "temperature": 3.2,
+                        "demand": 40.9
+                      },
+                      {
+                        "timestamp": "2026-01-08T00:00:00Z",
+                        "temperature": 2.7,
+                        "demand": 42.3
+                      }
+                    ],
+                    "query_times": [
+                      "2026-01-09T00:00:00Z",
+                      "2026-01-10T00:00:00Z",
+                      "2026-01-11T00:00:00Z"
+                    ],
+                    "seed": 7,
+                    "query_mode": "condition",
+                    "return_mode": "log_prob",
+                    "query_rows": [
+                      {
+                        "timestamp": "2026-01-09T00:00:00Z",
+                        "temperature": 1.5,
+                        "demand": 46.0
+                      },
+                      {
+                        "timestamp": "2026-01-10T00:00:00Z",
+                        "temperature": 2.2,
+                        "demand": 44.1
+                      },
+                      {
+                        "timestamp": "2026-01-11T00:00:00Z",
+                        "temperature": 3.0,
+                        "demand": 41.7
+                      }
+                    ],
+                    "conditions": [
+                      {
+                        "column": "temperature",
+                        "kind": "equality",
+                        "value": 1.5,
+                        "query_time_indices": [
+                          0
+                        ]
+                      },
+                      {
+                        "column": "temperature",
+                        "kind": "interval",
+                        "lower": 0.0,
+                        "upper": null,
+                        "query_time_indices": [
+                          1,
+                          2
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "health": {
+                  "summary": "Health through the prediction route",
+                  "value": {
+                    "request_type": "health"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/PredictResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HealthResponse"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is malformed, asks for something the service does not serve, names a version it does not speak, or asks for more samples than `max_sample_count`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "The request body stopped arriving before `Content-Length` bytes came.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "`Content-Length` exceeds `max_request_bytes`; the body is not read.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The service failed on a request it accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Request": {
+        "description": "The body of `POST /predict`.",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/PredictRequest"
+          },
+          {
+            "$ref": "#/components/schemas/HealthRequest"
+          }
+        ]
+      },
+      "PredictRequest": {
+        "type": "object",
+        "description": "A forecast or condition query over one table of rows. Rules that depend on the modes are listed under `allOf`.",
+        "properties": {
+          "request_type": {
+            "type": "string",
+            "enum": [
+              "predict"
+            ],
+            "default": "predict",
+            "description": "`predict`, the default. A request whose `request_type` is `health` is a `HealthRequest` instead."
+          },
+          "schema_version": {
+            "type": "string",
+            "const": "v6",
+            "description": "The version of this contract the request speaks; any other is refused with `SCHEMA_VERSION_MISMATCH`."
+          },
+          "model_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When set, the service refuses the request with `MODEL_VERSION_MISMATCH` unless it serves exactly this `model_version`, as `/healthz` reports it."
+          },
+          "query_mode": {
+            "type": "string",
+            "enum": [
+              "forecast",
+              "condition"
+            ],
+            "default": "forecast",
+            "description": "What the request asks of the distribution; defaults to `forecast`.\n\n- `forecast`: The joint distribution of the columns at each future position, given the history.\n- `condition`: The same, additionally conditioned at the positions `conditions` covers on pinned values or bands of some columns; a position no condition covers answers as in `forecast`. Served only where `/healthz` lists it in `supported_query_modes`."
+          },
+          "return_mode": {
+            "type": "string",
+            "enum": [
+              "mean",
+              "samples",
+              "quantiles",
+              "log_prob"
+            ],
+            "default": "mean",
+            "description": "What the response carries; defaults to `mean`. `/healthz` lists the modes a service serves in `supported_return_modes`.\n\n- `mean`: The mean of each requested column at each future position.\n- `samples`: `n_samples` draws from the joint distribution, each covering every future position and requested column.\n- `quantiles`: The marginal quantiles at the levels `quantiles` lists, per future position and requested column.\n- `log_prob`: The joint log density of the observed `query_rows` at each future position."
+          },
+          "time_index_mode": {
+            "type": "string",
+            "enum": [
+              "ordinal",
+              "continuous_float",
+              "absolute_datetime"
+            ],
+            "description": "How the request's times read. `/healthz` lists the modes a service serves in `supported_time_index_modes`.\n\n- `ordinal`: Times are integer steps of a regular grid. Without `time_column`, history rows sit at steps `0` to `rows - 1`.\n- `continuous_float`: Times are real numbers in the column `time_column` names.\n- `absolute_datetime`: Times are ISO 8601 timestamps in the column `time_column` names."
+          },
+          "time_column": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The row key holding each row's time; it must not name a declared column. Required unless `time_index_mode` is `ordinal`."
+          },
+          "time_scale_seconds": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Seconds per time unit the model reads `absolute_datetime` times in; defaults to 31557600, one Julian year."
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IANA zone name, such as `Europe/Berlin`, of the `absolute_datetime` timestamps; it must match the zone the timestamps carry, if any."
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnDescriptor"
+            },
+            "minItems": 1,
+            "description": "The columns of every row, in the order the response reports them by default. `/healthz` reports the column counts the model was built for in `data_generation`."
+          },
+          "requested_columns": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The columns the response carries, in this order, each by name or by zero-based index into `columns`; omitted or `null`, every declared column in declared order. A `log_prob` request names every declared column in declared order or omits the field."
+          },
+          "history_rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Row"
+            },
+            "minItems": 1,
+            "description": "The observed rows, in strictly increasing time order. Each holds a finite number for every declared column and, when `time_column` is set, the row's time."
+          },
+          "query_times": {
+            "type": "array",
+            "items": {
+              "type": [
+                "string",
+                "number"
+              ]
+            },
+            "minItems": 1,
+            "description": "The future times to answer, strictly increasing and after the last history time: ISO 8601 timestamps for `absolute_datetime`, numbers otherwise. Each is one future position of the response."
+          },
+          "query_rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Row"
+            },
+            "minItems": 1,
+            "description": "Read only, and required, for `log_prob`: the observed row at each query time, in `query_times` order, with a finite value for every declared column and, when `time_column` is set, its query time."
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Condition"
+            },
+            "minItems": 1,
+            "description": "Required for, and allowed only with, `query_mode` `condition`. A column carries at most one condition per position, and every position keeps at least one column unconditioned."
+          },
+          "n_samples": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of draws behind `samples` and behind any answer the service estimates by sampling. Defaults to the service's `max_sample_count`, which `/healthz` reports and no request may exceed (`INPUT_SIZE_EXCEEDED`)."
+          },
+          "quantiles": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "exclusiveMaximum": 1
+            },
+            "minItems": 1,
+            "description": "Read only, and required, for `quantiles`: the levels, each strictly between 0 and 1, in the order the response reports them."
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Seeds the service's random draws. The same request with the same seed returns the same answer while `/healthz` reports the same `checkpoint_version`, `image_version`, `device`, and `precision`. `requested_columns` only selects among the draws, so changing it leaves the columns still returned unchanged; changing anything else, `n_samples` included, can change every draw. Omitted or `null`, draws differ per request."
+          }
+        },
+        "required": [
+          "schema_version",
+          "time_index_mode",
+          "columns",
+          "history_rows",
+          "query_times"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "time_index_mode"
+              ],
+              "properties": {
+                "time_index_mode": {
+                  "const": "ordinal"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "query_times": {
+                  "items": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "time_index_mode"
+              ],
+              "properties": {
+                "time_index_mode": {
+                  "const": "continuous_float"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "query_times": {
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "time_column": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "time_column"
+              ]
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "time_index_mode"
+              ],
+              "properties": {
+                "time_index_mode": {
+                  "const": "absolute_datetime"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "query_times": {
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "time_column": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "time_column"
+              ]
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "return_mode"
+              ],
+              "properties": {
+                "return_mode": {
+                  "const": "quantiles"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "quantiles"
+              ]
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "return_mode"
+              ],
+              "properties": {
+                "return_mode": {
+                  "const": "log_prob"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "query_rows"
+              ]
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "query_mode"
+              ],
+              "properties": {
+                "query_mode": {
+                  "const": "condition"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "conditions"
+              ]
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "conditions"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "HealthRequest": {
+        "type": "object",
+        "description": "Asks for the `/healthz` payload through `POST /predict`. The service reads no other field.",
+        "properties": {
+          "request_type": {
+            "type": "string",
+            "const": "health"
+          }
+        },
+        "required": [
+          "request_type"
+        ]
+      },
+      "ColumnDescriptor": {
+        "type": "object",
+        "description": "One column of every row.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The column's name, unique among `columns`: the key of its value in each row and the name the response reports it under."
+          },
+          "modality": {
+            "type": "string",
+            "const": "numeric",
+            "description": "The column's value type: `numeric`."
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "target",
+                  "feature"
+                ],
+                "default": "feature"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the column is to the caller; defaults to `feature`.\n\n- `target`: A column the caller cares about forecasting.\n- `feature`: A column that informs the forecast. The model forecasts every column whatever its role."
+          },
+          "lower_bound": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A lower bound every sampled draw of the column respects; at most `upper_bound`. Read only for `samples`: a draw outside the bound is replaced by a fresh draw, across all columns of its position at once, so the draws follow the joint distribution restricted to the bounds. A bound that draws still miss after 100 redraws is refused with `VALIDATION_ERROR` on this field."
+          },
+          "upper_bound": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An upper bound every sampled draw of the column respects. Read only for `samples`: a draw outside the bound is replaced by a fresh draw, across all columns of its position at once, so the draws follow the joint distribution restricted to the bounds. A bound that draws still miss after 100 redraws is refused with `VALIDATION_ERROR` on this field."
+          }
+        },
+        "required": [
+          "name",
+          "modality"
+        ],
+        "additionalProperties": false
+      },
+      "Row": {
+        "type": "object",
+        "description": "One row: a value per declared column, keyed by the column's name, and the row's time under `time_column`. Other keys are ignored.",
+        "additionalProperties": {
+          "type": [
+            "number",
+            "string"
+          ]
+        }
+      },
+      "Condition": {
+        "description": "One condition, told apart by `kind`.",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/EqualityCondition"
+          },
+          {
+            "$ref": "#/components/schemas/IntervalCondition"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "kind",
+          "mapping": {
+            "equality": "#/components/schemas/EqualityCondition",
+            "interval": "#/components/schemas/IntervalCondition"
+          }
+        }
+      },
+      "EqualityCondition": {
+        "type": "object",
+        "description": "Pins one column to one value at the covered positions.",
+        "properties": {
+          "column": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The name of the declared column the condition applies to."
+          },
+          "kind": {
+            "type": "string",
+            "const": "equality",
+            "description": "The condition kind."
+          },
+          "value": {
+            "type": "number",
+            "description": "The finite value the column is pinned to."
+          },
+          "query_time_indices": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Zero-based indices into `query_times` of the future positions the condition covers; `null` covers every position."
+          }
+        },
+        "required": [
+          "column",
+          "kind",
+          "value",
+          "query_time_indices"
+        ],
+        "additionalProperties": false
+      },
+      "IntervalCondition": {
+        "type": "object",
+        "description": "Confines one column to a band at the covered positions.",
+        "properties": {
+          "column": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The name of the declared column the condition applies to."
+          },
+          "kind": {
+            "type": "string",
+            "const": "interval",
+            "description": "The condition kind."
+          },
+          "lower": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The band's finite lower end, below `upper`; `null` leaves it open."
+          },
+          "upper": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The band's finite upper end; `null` leaves it open. A band open on both sides conditions nothing and is refused."
+          },
+          "query_time_indices": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Zero-based indices into `query_times` of the future positions the condition covers; `null` covers every position."
+          }
+        },
+        "required": [
+          "column",
+          "kind",
+          "lower",
+          "upper",
+          "query_time_indices"
+        ],
+        "additionalProperties": false
+      },
+      "PredictResponse": {
+        "description": "The answer to a prediction request, one variant per return mode.",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/MeanResponse"
+          },
+          {
+            "$ref": "#/components/schemas/SamplesResponse"
+          },
+          {
+            "$ref": "#/components/schemas/QuantilesResponse"
+          },
+          {
+            "$ref": "#/components/schemas/LogProbResponse"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "return_mode",
+          "mapping": {
+            "mean": "#/components/schemas/MeanResponse",
+            "samples": "#/components/schemas/SamplesResponse",
+            "quantiles": "#/components/schemas/QuantilesResponse",
+            "log_prob": "#/components/schemas/LogProbResponse"
+          }
+        }
+      },
+      "MeanResponse": {
+        "title": "MeanResponse",
+        "type": "object",
+        "description": "The answer to a `return_mode` `mean` request.",
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "v6",
+            "description": "As `/healthz` reports it."
+          },
+          "image_version": {
+            "type": "string",
+            "description": "As `/healthz` reports it."
+          },
+          "model_version": {
+            "type": "string",
+            "description": "As `/healthz` reports it."
+          },
+          "checkpoint_version": {
+            "type": "string",
+            "description": "As `/healthz` reports it."
+          },
+          "head": {
+            "type": "string",
+            "description": "As `/healthz` reports it."
+          },
+          "query_mode": {
+            "type": "string",
+            "enum": [
+              "forecast",
+              "condition"
+            ],
+            "description": "The request's query mode."
+          },
+          "return_mode": {
+            "type": "string",
+            "const": "mean",
+            "description": "The request's return mode, which decides the variant."
+          },
+          "outputs": {
+            "$ref": "#/components/schemas/MeanOutputs",
+            "description": "The answer."
+          },
+          "plausibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Plausibility"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How plausible a `condition` query's conditions are under the forecast; `null` for `forecast` queries."
+          },
+          "diagnostics": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ForecastDiagnostics"
+              },
+              {
+                "$ref": "#/components/schemas/ConditionDiagnostics"
+              }
+            ],
+            "description": "Counts behind the answer."
+          },
+          "errors": {
+            "type": "array",
+            "maxItems": 0,
+            "description": "Empty in every successful response."
+          }
+        },
+        "required": [
+          "schema_version",
+          "image_version",
+          "model_version",
+          "checkpoint_version",
+          "head",
+          "query_mode",
+          "return_mode",
+          "outputs",
+          "plausibility",
+          "diagnostics",
+          "errors"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "query_mode": {
+                  "const": "condition"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "plausibility": {
+                  "$ref": "#/components/schemas/Plausibility"
+                },
+                "diagnostics": {
+                  "$ref": "#/components/schemas/ConditionDiagnostics"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "plausibility": {
+                  "type": "null"
+                },
+                "diagnostics": {
+                  "$ref": "#/components/schemas/ForecastDiagnostics"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "MeanOutputs": {
+        "type": "object",
+        "description": "The `outputs` of a `mean` response.",
+        "properties": {
+          "query_times": {
+            "type": "array",
+            "items": {
+              "type": [
+                "string",
+                "number"
+              ]
+            },
+            "description": "The request's `query_times`, one per future position: ISO 8601 strings for `absolute_datetime`, numbers otherwise."
+          },
+          "requested_columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The names of the columns the answer covers, in its column order."
+          },
+          "mean": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "description": "Indexed `[position][column]`: the mean of each requested column at each future position."
+          },
+          "samples": {
+            "type": "null",
+            "description": "`null`: filled only by `samples` responses."
+          },
+          "quantiles": {
+            "type": "null",
+            "description": "`null`: filled only by `quantiles` responses."
+          },
+          "log_prob": {
+            "type": "null",
+            "description": "`null`: filled only by `log_prob` responses."
+          }
+        },
+        "required": [
+          "query_times",
+          "requested_columns",
+          "mean",
+          "samples",
+          "quantiles",
+          "log_prob"
+        ],
+        "additionalProperties": false
+      },
+      "SamplesResponse": {
+        "title": "SamplesResponse",
+        "type": "object",
+        "description": "The answer to a `return_mode` `samples` request.",
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "v6",
+            "description": "As `/healthz` reports it."
+          },
+          "image_version": {
+            "type": "string",
+            "description": "As `/healthz` reports it."
+          },
+          "model_version": {
+            "type": "string",
+            "description": "As `/healthz` reports it."
+          },
+          "checkpoint_version": {
+            "type": "string",
+            "description": "As `/healthz` reports it."
+          },
+          "head": {
+            "type": "string",
+            "description": "As `/healthz` reports it."
+          },
+          "query_mode": {
+            "type": "string",
+            "enum": [
+              "forecast",
+              "condition"
+            ],
+            "description": "The request's query mode."
+          },
+          "return_mode": {
+            "type": "string",
+            "const": "samples",
+            "description": "The request's return mode, which decides the variant."
+          },
+          "outputs": {
+            "$ref": "#/components/schemas/SamplesOutputs",
+            "description": "The answer."
+          },
+          "plausibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Plausibility"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How plausible a `condition` query's conditions are under the forecast; `null` for `forecast` queries."
+          },
+          "diagnostics": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ForecastDiagnostics"
+              },
+              {
+                "$ref": "#/components/schemas/ConditionDiagnostics"
+              }
+            ],
+            "description": "Counts behind the answer."
+          },
+          "errors": {
+            "type": "array",
+            "maxItems": 0,
+            "description": "Empty in every successful response."
+          }
+        },
+        "required": [
+          "schema_version",
+          "image_version",
+          "model_version",
+          "checkpoint_version",
+          "head",
+          "query_mode",
+          "return_mode",
+          "outputs",
+          "plausibility",
+          "diagnostics",
+          "errors"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "query_mode": {
+                  "const": "condition"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "plausibility": {
+                  "$ref": "#/components/schemas/Plausibility"
+                },
+                "diagnostics": {
+                  "$ref": "#/components/schemas/ConditionDiagnostics"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "plausibility": {
+                  "type": "null"
+                },
+                "diagnostics": {
+                  "$ref": "#/components/schemas/ForecastDiagnostics"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "SamplesOutputs": {
+        "type": "object",
+        "description": "The `outputs` of a `samples` response.",
+        "properties": {
+          "query_times": {
+            "type": "array",
+            "items": {
+              "type": [
+                "string",
+                "number"
+              ]
+            },
+            "description": "The request's `query_times`, one per future position: ISO 8601 strings for `absolute_datetime`, numbers otherwise."
+          },
+          "requested_columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The names of the columns the answer covers, in its column order."
+          },
+          "mean": {
+            "type": "null",
+            "description": "`null`: filled only by `mean` responses."
+          },
+          "samples": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              }
+            },
+            "description": "Indexed `[draw][position][column]`: `n_samples` joint draws."
+          },
+          "quantiles": {
+            "type": "null",
+            "description": "`null`: filled only by `quantiles` responses."
+          },
+          "log_prob": {
+            "type": "null",
+            "description": "`null`: filled only by `log_prob` responses."
+          }
+        },
+        "required": [
+          "query_times",
+          "requested_columns",
+          "mean",
+          "samples",
+          "quantiles",
+          "log_prob"
+        ],
+        "additionalProperties": false
+      },
+      "QuantilesResponse": {
+        "title": "QuantilesResponse",
+        "type": "object",
+        "description": "The answer to a `return_mode` `quantiles` request.",
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "v6",
+            "description": "As `/healthz` reports it."
+          },
+          "image_version": {
+            "type": "string",
+            "description": "As `/healthz` reports it."
+          },
+          "model_version": {
+            "type": "string",
+            "description": "As `/healthz` reports it."
+          },
+          "checkpoint_version": {
+            "type": "string",
+            "description": "As `/healthz` reports it."
+          },
+          "head": {
+            "type": "string",
+            "description": "As `/healthz` reports it."
+          },
+          "query_mode": {
+            "type": "string",
+            "enum": [
+              "forecast",
+              "condition"
+            ],
+            "description": "The request's query mode."
+          },
+          "return_mode": {
+            "type": "string",
+            "const": "quantiles",
+            "description": "The request's return mode, which decides the variant."
+          },
+          "outputs": {
+            "$ref": "#/components/schemas/QuantilesOutputs",
+            "description": "The answer."
+          },
+          "plausibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Plausibility"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How plausible a `condition` query's conditions are under the forecast; `null` for `forecast` queries."
+          },
+          "diagnostics": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ForecastDiagnostics"
+              },
+              {
+                "$ref": "#/components/schemas/ConditionDiagnostics"
+              }
+            ],
+            "description": "Counts behind the answer."
+          },
+          "errors": {
+            "type": "array",
+            "maxItems": 0,
+            "description": "Empty in every successful response."
+          }
+        },
+        "required": [
+          "schema_version",
+          "image_version",
+          "model_version",
+          "checkpoint_version",
+          "head",
+          "query_mode",
+          "return_mode",
+          "outputs",
+          "plausibility",
+          "diagnostics",
+          "errors"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "query_mode": {
+                  "const": "condition"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "plausibility": {
+                  "$ref": "#/components/schemas/Plausibility"
+                },
+                "diagnostics": {
+                  "$ref": "#/components/schemas/ConditionDiagnostics"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "plausibility": {
+                  "type": "null"
+                },
+                "diagnostics": {
+                  "$ref": "#/components/schemas/ForecastDiagnostics"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "QuantilesOutputs": {
+        "type": "object",
+        "description": "The `outputs` of a `quantiles` response.",
+        "properties": {
+          "query_times": {
+            "type": "array",
+            "items": {
+              "type": [
+                "string",
+                "number"
+              ]
+            },
+            "description": "The request's `query_times`, one per future position: ISO 8601 strings for `absolute_datetime`, numbers otherwise."
+          },
+          "requested_columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The names of the columns the answer covers, in its column order."
+          },
+          "mean": {
+            "type": "null",
+            "description": "`null`: filled only by `mean` responses."
+          },
+          "samples": {
+            "type": "null",
+            "description": "`null`: filled only by `samples` responses."
+          },
+          "quantiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuantileLevel"
+            },
+            "description": "One entry per requested level, in request order."
+          },
+          "log_prob": {
+            "type": "null",
+            "description": "`null`: filled only by `log_prob` responses."
+          }
+        },
+        "required": [
+          "query_times",
+          "requested_columns",
+          "mean",
+          "samples",
+          "quantiles",
+          "log_prob"
+        ],
+        "additionalProperties": false
+      },
+      "LogProbResponse": {
+        "title": "LogProbResponse",
+        "type": "object",
+        "description": "The answer to a `return_mode` `log_prob` request.",
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "v6",
+            "description": "As `/healthz` reports it."
+          },
+          "image_version": {
+            "type": "string",
+            "description": "As `/healthz` reports it."
+          },
+          "model_version": {
+            "type": "string",
+            "description": "As `/healthz` reports it."
+          },
+          "checkpoint_version": {
+            "type": "string",
+            "description": "As `/healthz` reports it."
+          },
+          "head": {
+            "type": "string",
+            "description": "As `/healthz` reports it."
+          },
+          "query_mode": {
+            "type": "string",
+            "enum": [
+              "forecast",
+              "condition"
+            ],
+            "description": "The request's query mode."
+          },
+          "return_mode": {
+            "type": "string",
+            "const": "log_prob",
+            "description": "The request's return mode, which decides the variant."
+          },
+          "outputs": {
+            "$ref": "#/components/schemas/LogProbOutputs",
+            "description": "The answer."
+          },
+          "plausibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Plausibility"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How plausible a `condition` query's conditions are under the forecast; `null` for `forecast` queries."
+          },
+          "diagnostics": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ForecastDiagnostics"
+              },
+              {
+                "$ref": "#/components/schemas/ConditionDiagnostics"
+              }
+            ],
+            "description": "Counts behind the answer."
+          },
+          "errors": {
+            "type": "array",
+            "maxItems": 0,
+            "description": "Empty in every successful response."
+          }
+        },
+        "required": [
+          "schema_version",
+          "image_version",
+          "model_version",
+          "checkpoint_version",
+          "head",
+          "query_mode",
+          "return_mode",
+          "outputs",
+          "plausibility",
+          "diagnostics",
+          "errors"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "query_mode": {
+                  "const": "condition"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "plausibility": {
+                  "$ref": "#/components/schemas/Plausibility"
+                },
+                "diagnostics": {
+                  "$ref": "#/components/schemas/ConditionDiagnostics"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "plausibility": {
+                  "type": "null"
+                },
+                "diagnostics": {
+                  "$ref": "#/components/schemas/ForecastDiagnostics"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "LogProbOutputs": {
+        "type": "object",
+        "description": "The `outputs` of a `log_prob` response.",
+        "properties": {
+          "query_times": {
+            "type": "array",
+            "items": {
+              "type": [
+                "string",
+                "number"
+              ]
+            },
+            "description": "The request's `query_times`, one per future position: ISO 8601 strings for `absolute_datetime`, numbers otherwise."
+          },
+          "requested_columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The names of the columns the answer covers, in its column order."
+          },
+          "mean": {
+            "type": "null",
+            "description": "`null`: filled only by `mean` responses."
+          },
+          "samples": {
+            "type": "null",
+            "description": "`null`: filled only by `samples` responses."
+          },
+          "quantiles": {
+            "type": "null",
+            "description": "`null`: filled only by `quantiles` responses."
+          },
+          "log_prob": {
+            "$ref": "#/components/schemas/LogProbScores",
+            "description": "The log density of the observed `query_rows`."
+          }
+        },
+        "required": [
+          "query_times",
+          "requested_columns",
+          "mean",
+          "samples",
+          "quantiles",
+          "log_prob"
+        ],
+        "additionalProperties": false
+      },
+      "QuantileLevel": {
+        "type": "object",
+        "description": "The quantiles at one level.",
+        "properties": {
+          "quantile": {
+            "type": "number",
+            "description": "The requested level."
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "description": "Indexed `[position][column]`: the level's quantile of each requested column at each future position."
+          }
+        },
+        "required": [
+          "quantile",
+          "values"
+        ],
+        "additionalProperties": false
+      },
+      "LogProbScores": {
+        "type": "object",
+        "description": "The log density of the observed rows, per position and summed.",
+        "properties": {
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "The joint log density of the observed row at each future position."
+          },
+          "nll_values": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "The negated `values`."
+          },
+          "total": {
+            "type": "number",
+            "description": "The sum of `values`."
+          },
+          "mean": {
+            "type": "number",
+            "description": "The mean of `values`."
+          },
+          "nll_total": {
+            "type": "number",
+            "description": "The negated `total`."
+          },
+          "nll_mean": {
+            "type": "number",
+            "description": "The negated `mean`."
+          }
+        },
+        "required": [
+          "values",
+          "nll_values",
+          "total",
+          "mean",
+          "nll_total",
+          "nll_mean"
+        ],
+        "additionalProperties": false
+      },
+      "Plausibility": {
+        "type": "object",
+        "description": "How plausible the conditions are under the forecast.",
+        "properties": {
+          "equality_log_density": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The joint log density of every pinned value under the forecast, summed over positions; `null` without equality conditions."
+          },
+          "region_log_probability": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The log probability of every band under the forecast given the pinned values, summed over positions; `null` without interval conditions. Its sum with `equality_log_density` is the plausibility of the whole condition set; only differences between comparable requests carry meaning."
+          }
+        },
+        "required": [
+          "equality_log_density",
+          "region_log_probability"
+        ],
+        "additionalProperties": false
+      },
+      "ForecastDiagnostics": {
+        "type": "object",
+        "description": "The diagnostics of a `forecast` response.",
+        "properties": {
+          "history_rows": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of history rows read."
+          },
+          "horizon_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of future positions answered."
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The request's `seed`, or `null`."
+          }
+        },
+        "required": [
+          "history_rows",
+          "horizon_count",
+          "seed"
+        ],
+        "additionalProperties": false
+      },
+      "ConditionDiagnostics": {
+        "type": "object",
+        "description": "The diagnostics of a `condition` response.",
+        "properties": {
+          "history_rows": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of history rows read."
+          },
+          "horizon_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of future positions answered."
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The request's `seed`, or `null`."
+          },
+          "condition_draws": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The draws behind each conditioned position's answer."
+          },
+          "interval_estimator": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IntervalEstimator"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The estimate behind the band probability at the position whose estimate is least supported; `null` unless some position bands more than one column."
+          }
+        },
+        "required": [
+          "history_rows",
+          "horizon_count",
+          "seed",
+          "condition_draws",
+          "interval_estimator"
+        ],
+        "additionalProperties": false
+      },
+      "IntervalEstimator": {
+        "type": "object",
+        "description": "The estimate behind a multi-column band probability.",
+        "properties": {
+          "points": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Quasi-random points per mixture component behind the estimate."
+          },
+          "effective_sample_size": {
+            "type": "number",
+            "description": "Kish's effective sample size of the estimate's importance weights; far below `points`, the estimate is unreliable."
+          }
+        },
+        "required": [
+          "points",
+          "effective_sample_size"
+        ],
+        "additionalProperties": false
+      },
+      "HealthResponse": {
+        "type": "object",
+        "description": "What the service serves and the limits a request must keep.",
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "description": "`ok` once the service has loaded its checkpoint and serves requests."
+          },
+          "schema_version": {
+            "type": "string",
+            "const": "v6",
+            "description": "The version of this contract the service speaks, which every prediction request sends."
+          },
+          "image_version": {
+            "type": "string",
+            "description": "The version of the `jointfm-inference` package."
+          },
+          "model_version": {
+            "type": "string",
+            "description": "Identifies the served model; a request may send it to be refused after the service changes models."
+          },
+          "checkpoint_version": {
+            "type": "string",
+            "description": "A label for the served checkpoint, by default the start of its SHA-256 digest."
+          },
+          "checkpoint_path": {
+            "type": "string",
+            "description": "Where the service reads the checkpoint file."
+          },
+          "device": {
+            "type": "string",
+            "description": "The device every model forward runs on, such as `cpu` or `cuda`."
+          },
+          "precision": {
+            "type": "string",
+            "enum": [
+              "fp32",
+              "bf16",
+              "fp16"
+            ],
+            "description": "The precision every model forward runs at.\n\n- `fp32`: Every operation runs in float32.\n- `bf16`: Matrix products and attention run in bfloat16 under automatic mixed precision; numerically sensitive operations stay in float32.\n- `fp16`: As `bf16`, in float16."
+          },
+          "generation": {
+            "type": "string",
+            "description": "The generation of the served checkpoint, such as `jointfm-1`."
+          },
+          "head": {
+            "type": "string",
+            "description": "The kind of the served model's output head."
+          },
+          "tail_map": {
+            "type": "string",
+            "description": "The per-column tail map the head's forecast applies, or `none`."
+          },
+          "decoding_strategy": {
+            "type": "string",
+            "description": "How the served model decodes future positions. A JointFM 1 model reports `parallel_dense`: one forward emits the joint distribution of every position, and each position is drawn on its own, so a draw is joint across the columns of a position and independent across positions."
+          },
+          "supported_query_modes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "forecast",
+                "condition"
+              ]
+            },
+            "description": "The query modes the service answers."
+          },
+          "supported_condition_kinds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "equality",
+                "interval"
+              ]
+            },
+            "description": "The condition kinds a `condition` query may use."
+          },
+          "supported_return_modes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "mean",
+                "samples",
+                "quantiles",
+                "log_prob"
+              ]
+            },
+            "description": "The return modes the service answers."
+          },
+          "supported_time_index_modes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "ordinal",
+                "continuous_float",
+                "absolute_datetime"
+              ]
+            },
+            "description": "The time-index modes the service reads."
+          },
+          "time_index_encoding": {
+            "type": "string",
+            "enum": [
+              "discrete_grid"
+            ],
+            "description": "How the served model reads time.\n\n- `discrete_grid`: The model reads time as integer steps of a regular grid."
+          },
+          "max_sample_count": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The largest `n_samples` a request may ask for, and its default."
+          },
+          "max_request_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The largest request body, in bytes, the service reads; a larger one is refused unread with `INPUT_SIZE_EXCEEDED`."
+          },
+          "max_concurrent_requests": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "How many prediction requests the service runs at once; further ones wait for a free slot."
+          },
+          "data_generation": {
+            "$ref": "#/components/schemas/CapacityEnvelope",
+            "description": "The request sizes the served model was built for."
+          }
+        },
+        "required": [
+          "status",
+          "schema_version",
+          "image_version",
+          "model_version",
+          "checkpoint_version",
+          "checkpoint_path",
+          "device",
+          "precision",
+          "generation",
+          "head",
+          "tail_map",
+          "decoding_strategy",
+          "supported_query_modes",
+          "supported_condition_kinds",
+          "supported_return_modes",
+          "supported_time_index_modes",
+          "time_index_encoding",
+          "max_sample_count",
+          "max_request_bytes",
+          "max_concurrent_requests",
+          "data_generation"
+        ],
+        "additionalProperties": false
+      },
+      "CapacityEnvelope": {
+        "type": "object",
+        "description": "The request sizes the served model was built for, so a client can size and split its requests.",
+        "properties": {
+          "min_series": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The fewest columns the model was built for."
+          },
+          "max_series": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The most columns the model was built for."
+          },
+          "t_input": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "The time span of the longest history the model was built for."
+          },
+          "t_output": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "The time span of the furthest horizon the model was built for."
+          },
+          "n_input": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The longest history the model was built for, in steps."
+          },
+          "n_output": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The longest horizon the model was built for, in steps."
+          }
+        },
+        "required": [
+          "min_series",
+          "max_series",
+          "t_input",
+          "t_output",
+          "n_input",
+          "n_output"
+        ],
+        "additionalProperties": false
+      },
+      "Error": {
+        "type": "object",
+        "description": "One reason the service refused or failed a request.",
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "VALIDATION_ERROR",
+              "UNSUPPORTED_HEAD_QUERY_COMBINATION",
+              "UNSUPPORTED_RETURN_MODE",
+              "INPUT_SIZE_EXCEEDED",
+              "SCHEMA_VERSION_MISMATCH",
+              "MODEL_VERSION_MISMATCH",
+              "INTERNAL_ERROR"
+            ],
+            "description": "What went wrong, as a value a client can branch on.\n\n- `VALIDATION_ERROR`: The request is malformed, asks for something the service does not serve, or asks for values the forecast puts almost no probability on, such as draws inside a column bound far from it; `field` names the offending field.\n- `UNSUPPORTED_HEAD_QUERY_COMBINATION`: In the catalog but not sent by this service: the mounted head answers every `query_mode`.\n- `UNSUPPORTED_RETURN_MODE`: In the catalog but not sent by this service: an unserved `return_mode` answers `VALIDATION_ERROR`.\n- `INPUT_SIZE_EXCEEDED`: The request exceeds a service cap: `n_samples` above `max_sample_count`, or a body above `max_request_bytes`. `requested` and `allowed` carry both sizes.\n- `SCHEMA_VERSION_MISMATCH`: `schema_version` differs from the version the service speaks.\n- `MODEL_VERSION_MISMATCH`: `model_version` differs from the version the service serves.\n- `INTERNAL_ERROR`: The service failed on a request it accepted."
+          },
+          "message": {
+            "type": "string",
+            "description": "What went wrong, for people."
+          },
+          "field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The request field or header the error is about, such as `columns[0].modality` or `Content-Length`; `null` when it concerns none."
+          },
+          "requested": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The size the request asked for, in the unit of `field`: samples for `n_samples`, bytes for `Content-Length`."
+          },
+          "allowed": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The largest size the service accepts, in the same unit."
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "field"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "enum": [
+                    "INPUT_SIZE_EXCEEDED"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "requested"
+              ]
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "requested"
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "code": {
+                  "enum": [
+                    "INPUT_SIZE_EXCEEDED"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "allowed"
+              ]
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "allowed"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "description": "The body of every non-200 response.",
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "v6",
+            "description": "The version of this contract the service speaks."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "minItems": 1,
+            "description": "Why the request was refused or failed."
+          }
+        },
+        "required": [
+          "schema_version",
+          "errors"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

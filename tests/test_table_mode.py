@@ -14,7 +14,7 @@
 
 """Tests for table requests: context rows, query rows, and requested cells.
 
-The ``table_*`` and ``jointfm_2_*`` fixtures are a JointFM 2 deployment's own
+The fixtures under ``jointfm_2/`` are a JointFM 2 deployment's own
 output for requests this client built: each request fixture is what the
 client sent, and each response fixture what the deployment answered.
 """
@@ -169,28 +169,39 @@ def test_a_deployment_that_answers_tables_passes_the_health_check(
     json_fixture_loader: Callable[[str], dict[str, Any]],
 ) -> None:
     """Advertising the table mode beside the forecast modes is a valid contract."""
-    health = json_fixture_loader("jointfm_2_health_metadata")
+    health = json_fixture_loader("jointfm_2/health_metadata")
     assert "unordered" in health["supported_time_index_modes"]
 
     validate_service_metadata(health, expected_model_version=health["model_version"])
 
 
-def test_a_time_index_mode_the_client_does_not_know_is_refused(
+def test_a_time_index_mode_the_client_does_not_know_passes_and_tables_stay_gated(
     json_fixture_loader: Callable[[str], dict[str, Any]],
 ) -> None:
-    """A subset check still refuses a mode newer than this client."""
-    health = json_fixture_loader("jointfm_2_health_metadata")
+    """A mode newer than this client passes health; a table still needs ``unordered``."""
+    health = json_fixture_loader("jointfm_2/health_metadata")
     health["supported_time_index_modes"] = ["ordinal", "spiral"]
+    transport = _TableTransport(health_payload=health)
+    client = _client(transport)
 
-    with pytest.raises(UnsupportedServiceContractError, match="spiral"):
-        validate_service_metadata(health)
+    assert client.health().supported_time_index_modes == ("ordinal", "spiral")
+    with pytest.raises(UnsupportedServiceContractError, match="does not answer table"):
+        client.predict_table(
+            list(_CONTEXT_ROWS),
+            query_rows=list(_QUERY_ROWS),
+            requested_cells=_REQUESTED_CELLS,
+            columns=_COLUMNS,
+        )
+    assert transport.payloads == []
 
 
 def test_a_jointfm_1_deployment_refuses_a_table_before_any_round_trip(
     json_fixture_loader: Callable[[str], dict[str, Any]],
 ) -> None:
     """A deployment that does not advertise tables never receives one."""
-    transport = _TableTransport(health_payload=json_fixture_loader("health_metadata"))
+    transport = _TableTransport(
+        health_payload=json_fixture_loader("jointfm_1/health_metadata")
+    )
 
     with pytest.raises(UnsupportedServiceContractError, match="does not answer table"):
         _client(transport).predict_table(
@@ -221,7 +232,7 @@ def test_the_dataframe_adapter_builds_the_request_the_deployment_accepted(
         **_CONTROLS[return_mode],
     )
 
-    assert payload == json_fixture_loader(f"table_{return_mode}_request")
+    assert payload == json_fixture_loader(f"jointfm_2/table_{return_mode}_request")
 
 
 @pytest.mark.parametrize("return_mode", list(_CONTROLS))
@@ -230,7 +241,9 @@ def test_row_mappings_build_the_same_request(
     json_fixture_loader: Callable[[str], dict[str, Any]],
 ) -> None:
     """Row mappings with explicit columns spell the same payload as frames."""
-    assert _payload(return_mode) == json_fixture_loader(f"table_{return_mode}_request")
+    assert _payload(return_mode) == json_fixture_loader(
+        f"jointfm_2/table_{return_mode}_request"
+    )
 
 
 @pytest.mark.parametrize("return_mode", list(_CONTROLS))
@@ -240,8 +253,8 @@ def test_each_answer_parses_into_its_table_result(
 ) -> None:
     """Values sit in the requested cells and NaN in every other answer cell."""
     result = TableResponse.from_payload(
-        json_fixture_loader(f"table_{return_mode}_response"),
-        request_payload=json_fixture_loader(f"table_{return_mode}_request"),
+        json_fixture_loader(f"jointfm_2/table_{return_mode}_response"),
+        request_payload=json_fixture_loader(f"jointfm_2/table_{return_mode}_request"),
     )
 
     assert isinstance(result, _RESULT_TYPES[return_mode])
@@ -270,8 +283,8 @@ def test_the_client_sends_a_table_and_types_the_answer(
 ) -> None:
     """The client checks the advertisement, sends the frames, and parses the answer."""
     transport = _TableTransport(
-        health_payload=json_fixture_loader("jointfm_2_health_metadata"),
-        predict_payload=json_fixture_loader("table_quantiles_response"),
+        health_payload=json_fixture_loader("jointfm_2/health_metadata"),
+        predict_payload=json_fixture_loader("jointfm_2/table_quantiles_response"),
     )
     history, query = _frames("quantiles")
 
@@ -287,7 +300,9 @@ def test_the_client_sends_a_table_and_types_the_answer(
 
     assert isinstance(result, TableQuantileResult)
     assert result.quantile_levels == (0.1, 0.9)
-    assert transport.payloads == [json_fixture_loader("table_quantiles_request")]
+    assert transport.payloads == [
+        json_fixture_loader("jointfm_2/table_quantiles_request")
+    ]
 
 
 def test_the_tidy_view_lists_only_the_requested_cells(
@@ -296,8 +311,8 @@ def test_the_tidy_view_lists_only_the_requested_cells(
     """Four cells were requested, so the tidy mean has four rows."""
     pytest.importorskip("pandas")
     result = TableResponse.from_payload(
-        json_fixture_loader("table_mean_response"),
-        request_payload=json_fixture_loader("table_mean_request"),
+        json_fixture_loader("jointfm_2/table_mean_response"),
+        request_payload=json_fixture_loader("jointfm_2/table_mean_request"),
     )
 
     tidy = result.to_pandas_tidy()
@@ -421,12 +436,13 @@ def test_an_answer_that_departs_from_the_request_is_refused(
     json_fixture_loader: Callable[[str], dict[str, Any]],
 ) -> None:
     """Every answer cell, row, and field must match what the request asked for."""
-    response = copy.deepcopy(json_fixture_loader("table_mean_response"))
+    response = copy.deepcopy(json_fixture_loader("jointfm_2/table_mean_response"))
     edit(response["outputs"])
 
     with pytest.raises(ValueError, match=message):
         TableResponse.from_payload(
-            response, request_payload=json_fixture_loader("table_mean_request")
+            response,
+            request_payload=json_fixture_loader("jointfm_2/table_mean_request"),
         )
 
 
@@ -434,8 +450,8 @@ def test_a_forecast_from_a_jointfm_2_deployment_carries_null_rows(
     json_fixture_loader: Callable[[str], dict[str, Any]],
 ) -> None:
     """A forecast answer names no table rows, and one that does is refused."""
-    request = json_fixture_loader("jointfm_2_forecast_mean_request")
-    response = json_fixture_loader("jointfm_2_forecast_mean_response")
+    request = json_fixture_loader("jointfm_2/forecast_mean_request")
+    response = json_fixture_loader("jointfm_2/forecast_mean_response")
     assert response["outputs"]["rows"] is None
 
     assert isinstance(
@@ -451,10 +467,10 @@ def test_a_malformed_table_answer_surfaces_as_a_service_error(
     json_fixture_loader: Callable[[str], dict[str, Any]],
 ) -> None:
     """The client reports a contract break as a service error, not a ValueError."""
-    response = copy.deepcopy(json_fixture_loader("table_mean_response"))
+    response = copy.deepcopy(json_fixture_loader("jointfm_2/table_mean_response"))
     response["outputs"]["requested_columns"] = ["price"]
     transport = _TableTransport(
-        health_payload=json_fixture_loader("jointfm_2_health_metadata"),
+        health_payload=json_fixture_loader("jointfm_2/health_metadata"),
         predict_payload=response,
     )
 

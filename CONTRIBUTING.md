@@ -181,6 +181,50 @@ start with an underscore are implementation details.
   ([tests/test_live_smoke.py](tests/test_live_smoke.py)) is gated by environment
   variables and skipped by default.
 
+## Following the Services
+
+The SDK speaks the wire contract of the public inference runner
+([joint-inference-python](https://github.com/datarobot-oss/joint-inference-python)),
+and its version is what users install to reach a deployment, so every runner
+release that changes a field, mode, or error code is followed by an SDK release
+that matches it, and projects that pin the SDK move their pin with it. SDK
+releases after 0.16.2 keep working with the newer runner meanwhile: the health
+check passes advertised values the SDK does not know and refuses only another
+`schema_version`, so the follow-up release is what lets users reach the new
+terms, not what keeps their client running.
+
+- `src/jointfm_client/openapi.json` is the runner's OpenAPI document of the
+  release that `RUNNER_VERSION` in the [Taskfile](Taskfile.yaml) names, copied
+  by `task contract:sync`; `openapi_document()` returns it. Never edit it by
+  hand.
+- `tests/fixtures/<service>/` holds one service's fixtures: `jointfm_1/` the
+  runner's, `jointfm_2/` those of a JointFM 2 deployment. Each
+  `<name>_request.json` is a request this SDK builds, and each
+  `<name>_response.json` and `health_metadata.json` what a running service
+  answered. Never write an answer by hand.
+- `tests/test_wire_contract.py` fails while `unknown_contract_terms` finds a
+  term of the document the SDK does not read, and while a `jointfm_1/` fixture
+  is not a body the document describes.
+
+To follow a runner release:
+
+```sh
+# in this checkout: set RUNNER_VERSION in Taskfile.yaml, then
+task contract:sync
+# in a runner checkout at that release's tag, from a second shell
+JOINTFM_INFERENCE_PORT=8080 task serve:tiny
+# back in this checkout
+task fixtures:capture
+task test
+```
+
+The capture sends every request fixture of `jointfm_1/`, checks each answer
+against the document, and replaces versions and the checkpoint path by fixed
+placeholders; it stops before writing anything when the document lists a
+query and return mode that no request fixture covers, so add one built with
+the SDK. Then make the SDK read what `test_wire_contract.py` names, update
+[docs/api-reference.md](docs/api-reference.md), and release.
+
 ## Releases
 
 Releases are cut by maintainers using Commitizen.

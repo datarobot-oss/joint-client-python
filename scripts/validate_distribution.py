@@ -48,10 +48,12 @@ REQUIRED_SDIST_MEMBERS = (
     "docs/api-reference.md",
     "pyproject.toml",
     "src/jointfm_client/__init__.py",
+    "src/jointfm_client/openapi.json",
     "src/jointfm_client/py.typed",
 )
 REQUIRED_WHEEL_MEMBERS = (
     "jointfm_client/__init__.py",
+    "jointfm_client/openapi.json",
     "jointfm_client/py.typed",
 )
 

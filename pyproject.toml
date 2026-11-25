@@ -66,6 +66,7 @@ dev = [
     "numexpr",
     "nbstripout",
     "pandas>=3.0.2",
+    "jsonschema>=4.26.0",
 ]
 
 [tool.uv]

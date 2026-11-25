@@ -1,0 +1,45 @@
+{
+  "checkpoint_path": "/models/jointfm.pt",
+  "checkpoint_version": "sdk-test",
+  "data_generation": {
+    "max_series": 4,
+    "min_series": 1,
+    "n_input": 24,
+    "n_output": 6,
+    "t_input": 1.0,
+    "t_output": 0.25
+  },
+  "decoding_strategy": "parallel_dense",
+  "device": "cpu",
+  "generation": "jointfm-1",
+  "head": "studentt",
+  "image_version": "0.3.0",
+  "max_concurrent_requests": 1,
+  "max_request_bytes": 111104,
+  "max_sample_count": 1000,
+  "model_version": "jointfm-inference:0.3.0+ckpt.sdk-test",
+  "precision": "bf16",
+  "schema_version": "v6",
+  "status": "ok",
+  "supported_condition_kinds": [
+    "equality",
+    "interval"
+  ],
+  "supported_query_modes": [
+    "forecast",
+    "condition"
+  ],
+  "supported_return_modes": [
+    "log_prob",
+    "mean",
+    "quantiles",
+    "samples"
+  ],
+  "supported_time_index_modes": [
+    "absolute_datetime",
+    "continuous_float",
+    "ordinal"
+  ],
+  "tail_map": "none",
+  "time_index_encoding": "discrete_grid"
+}

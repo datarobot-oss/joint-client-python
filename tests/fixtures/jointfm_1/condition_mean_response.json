@@ -1,0 +1,41 @@
+{
+  "checkpoint_version": "sdk-test",
+  "diagnostics": {
+    "condition_draws": 1000,
+    "history_rows": 2,
+    "horizon_count": 2,
+    "interval_estimator": null,
+    "seed": 7
+  },
+  "errors": [],
+  "head": "studentt",
+  "image_version": "0.3.0",
+  "model_version": "jointfm-inference:0.3.0+ckpt.sdk-test",
+  "outputs": {
+    "log_prob": null,
+    "mean": [
+      [
+        10.796463
+      ],
+      [
+        11.655964
+      ]
+    ],
+    "quantiles": null,
+    "query_times": [
+      2,
+      3
+    ],
+    "requested_columns": [
+      "target"
+    ],
+    "samples": null
+  },
+  "plausibility": {
+    "equality_log_density": -3.924791097640991,
+    "region_log_probability": null
+  },
+  "query_mode": "condition",
+  "return_mode": "mean",
+  "schema_version": "v6"
+}

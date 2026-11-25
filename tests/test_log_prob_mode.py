@@ -204,9 +204,14 @@ def test_a_score_may_leave_out_no_column_at_all_under_a_condition() -> None:
 @pytest.mark.parametrize(
     ("fixture_name", "condition", "requested_columns", "query_rows"),
     [
-        ("forecast_log_prob_request", None, ("driver", "target"), _QUERY_ROWS),
         (
-            "condition_log_prob_request",
+            "jointfm_1/forecast_log_prob_request",
+            None,
+            ("driver", "target"),
+            _QUERY_ROWS,
+        ),
+        (
+            "jointfm_1/condition_log_prob_request",
             _PIN_DRIVER,
             ("driver", "target"),
             _PINNED_QUERY_ROWS,
@@ -234,16 +239,19 @@ def test_the_scored_response_parses_into_its_own_result(
     json_fixture_loader: Callable[[str], dict[str, Any]],
 ) -> None:
     """A score has a horizon axis and no column axis, and says so in its result."""
+    payload = json_fixture_loader("jointfm_1/forecast_log_prob_response")
+    sent = payload["outputs"]["log_prob"]
     result = ForecastResponse.from_payload(
-        json_fixture_loader("forecast_log_prob_response"),
-        request_payload=json_fixture_loader("forecast_log_prob_request"),
+        payload,
+        request_payload=json_fixture_loader("jointfm_1/forecast_log_prob_request"),
     )
 
     assert isinstance(result, LogProbResult)
-    np.testing.assert_array_equal(result.log_prob.values, (-2.5, -3.25))
-    np.testing.assert_array_equal(result.log_prob.nll_values, (2.5, 3.25))
-    assert result.log_prob.total == pytest.approx(-5.75)
-    assert result.log_prob.mean == pytest.approx(-2.875)
+    assert result.log_prob.values.shape == (2,)
+    np.testing.assert_array_equal(result.log_prob.values, sent["values"])
+    np.testing.assert_array_equal(result.log_prob.nll_values, sent["nll_values"])
+    assert result.log_prob.total == pytest.approx(sent["total"])
+    assert result.log_prob.mean == pytest.approx(sent["mean"])
     assert result.plausibility is None
     assert result.outputs.log_prob is result.log_prob
 
@@ -254,13 +262,14 @@ def test_the_scored_conversions_keep_the_horizon_axis(
     """Tidy carries one row per scored position; wide carries the request summary."""
     pytest.importorskip("pandas")
     pytest.importorskip("numpy")
+    payload = json_fixture_loader("jointfm_1/forecast_log_prob_response")
     result = ForecastResponse.from_payload(
-        json_fixture_loader("forecast_log_prob_response"),
-        request_payload=json_fixture_loader("forecast_log_prob_request"),
+        payload,
+        request_payload=json_fixture_loader("jointfm_1/forecast_log_prob_request"),
     )
     assert isinstance(result, LogProbResult)
 
-    assert result.to_numpy().tolist() == [-2.5, -3.25]
+    assert result.to_numpy().tolist() == payload["outputs"]["log_prob"]["values"]
     tidy = result.to_pandas_tidy()
     assert list(tidy.columns) == ["query_time", "log_prob", "nll"]
     assert tidy["query_time"].tolist() == [2, 3]
@@ -275,7 +284,7 @@ def test_a_summary_that_disagrees_with_its_scores_is_refused(
     field: str,
 ) -> None:
     """The summaries are redundant, so a payload that disagrees with itself is broken."""
-    payload = json_fixture_loader("forecast_log_prob_response")
+    payload = json_fixture_loader("jointfm_1/forecast_log_prob_response")
     payload["outputs"]["log_prob"][field] += 1.0
 
     with pytest.raises(ValueError, match=f"outputs.log_prob.{field} disagrees"):
@@ -286,7 +295,7 @@ def test_a_scored_response_is_never_read_as_another_mode(
     json_fixture_loader: Callable[[str], dict[str, Any]],
 ) -> None:
     """A mode whose block is absent must fail on its own field, not on another's."""
-    payload = json_fixture_loader("forecast_mean_response")
+    payload = json_fixture_loader("jointfm_1/forecast_mean_response")
     payload["return_mode"] = "log_prob"
 
     with pytest.raises(ValueError, match="outputs.log_prob"):
@@ -297,9 +306,10 @@ def test_the_client_scores_observed_rows_and_types_the_answer(
     json_fixture_loader: Callable[[str], dict[str, Any]],
 ) -> None:
     """The typed helper puts the rows on the wire and types what comes back."""
+    answer = json_fixture_loader("jointfm_1/forecast_log_prob_response")
     transport = _ScoringTransport(
-        health_payload=json_fixture_loader("health_metadata"),
-        predict_payload=json_fixture_loader("forecast_log_prob_response"),
+        health_payload=json_fixture_loader("jointfm_1/health_metadata"),
+        predict_payload=answer,
     )
 
     result = _client(transport).forecast_log_prob(
@@ -313,7 +323,9 @@ def test_the_client_scores_observed_rows_and_types_the_answer(
     )
 
     assert isinstance(result, LogProbResult)
-    np.testing.assert_array_equal(result.log_prob.values, (-2.5, -3.25))
+    np.testing.assert_array_equal(
+        result.log_prob.values, answer["outputs"]["log_prob"]["values"]
+    )
     sent = transport.payloads[0]
     assert sent["return_mode"] == "log_prob"
     assert sent["query_rows"] == [dict(row) for row in _QUERY_ROWS]
@@ -323,12 +335,13 @@ def test_the_client_scores_under_a_condition(
     json_fixture_loader: Callable[[str], dict[str, Any]],
 ) -> None:
     """A conditioned score answers every position and reports its pin."""
-    health_payload = json_fixture_loader("health_metadata")
+    health_payload = json_fixture_loader("jointfm_1/health_metadata")
     health_payload["supported_query_modes"] = ["forecast", "condition"]
     health_payload["supported_condition_kinds"] = ["equality", "interval"]
+    answer = json_fixture_loader("jointfm_1/condition_log_prob_response")
     transport = _ScoringTransport(
         health_payload=health_payload,
-        predict_payload=json_fixture_loader("condition_log_prob_response"),
+        predict_payload=answer,
     )
 
     result = _client(transport).forecast_log_prob(
@@ -344,8 +357,12 @@ def test_the_client_scores_under_a_condition(
 
     assert isinstance(result, LogProbResult)
     assert result.query_times == (2, 3)
-    np.testing.assert_array_equal(result.log_prob.values, (-2.5, -1.75))
-    assert result.plausibility == ConditionPlausibility(equality_log_density=-1.27)
+    np.testing.assert_array_equal(
+        result.log_prob.values, answer["outputs"]["log_prob"]["values"]
+    )
+    assert result.plausibility == ConditionPlausibility(
+        equality_log_density=answer["plausibility"]["equality_log_density"]
+    )
     sent = transport.payloads[0]
     assert sent["query_mode"] == "condition"
     assert sent["query_rows"] == [dict(row) for row in _PINNED_QUERY_ROWS]

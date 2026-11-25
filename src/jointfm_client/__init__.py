@@ -179,6 +179,7 @@ from jointfm_client.transport import (
     JointFMRetryConfig,
     JointFMTimeoutConfig,
 )
+from jointfm_client.wire_contract import openapi_document, unknown_contract_terms
 
 __version__ = PACKAGE_VERSION
 
@@ -324,9 +325,11 @@ __all__ = [
     "normalize_hosted_deployment_url",
     "normalize_hosted_predict_url",
     "normalize_local_service_base_url",
+    "openapi_document",
     "plan_forecast_columns",
     "resolve_notebook_project_root",
     "run_max_utilization_check",
+    "unknown_contract_terms",
     "validate_datarobot_api_token",
     "validate_forecast_horizon",
     "validate_service_metadata",

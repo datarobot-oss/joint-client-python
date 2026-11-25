@@ -34,7 +34,7 @@ from jointfm_client.contract import (
     TimeValueKind,
     build_forecast_payload,
 )
-from jointfm_client.contract import (
+from jointfm_client.contract.request import (
     _serialize_absolute_datetime,
     _to_json_compatible,
 )

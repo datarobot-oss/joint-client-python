@@ -1,0 +1,12 @@
+{
+  "errors": [
+    {
+      "allowed": 1000,
+      "code": "INPUT_SIZE_EXCEEDED",
+      "field": "n_samples",
+      "message": "n_samples exceeds the configured container cap: requested 1001, max 1000",
+      "requested": 1001
+    }
+  ],
+  "schema_version": "v6"
+}

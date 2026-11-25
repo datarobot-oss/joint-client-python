@@ -5,6 +5,11 @@ silent: true
 
 vars:
   TYPOS_VERSION: '{{.TYPOS_VERSION | default "1.45.1"}}'
+  # The runner release whose wire contract this SDK speaks: contract:sync copies
+  # that release's OpenAPI document, and fixtures:capture refuses a service of
+  # any other version.
+  RUNNER_VERSION: 0.10.1
+  RUNNER_DOCUMENT_URL: https://raw.githubusercontent.com/datarobot-oss/joint-inference-python/v{{.RUNNER_VERSION}}/src/jointfm_inference/model/service/wire_schema/openapi.json
   # Scanner images: docker resolves the digest and ignores the tag, which is kept for readers.
   GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
   OSV_SCANNER_IMAGE: ghcr.io/google/osv-scanner:v2.7.0@sha256:4f3b7e2c64b9d38a5febc5a7e4a3dfef1d1362f726dea7a2ef4762b46469fcd0
@@ -127,6 +132,29 @@ tasks:
   test:
     desc: Run the unit test suite
     cmd: uv run pytest -n auto
+
+  contract:sync:
+    desc: Copy the OpenAPI document of the runner release RUNNER_VERSION names into the package; capture the fixtures again afterwards
+    cmd: |
+      if curl --fail --silent --show-error --location "{{.RUNNER_DOCUMENT_URL}}" --output src/jointfm_client/openapi.json; then
+        echo "OK: copied the OpenAPI document of runner {{.RUNNER_VERSION}}"
+      else
+        echo "FAIL: could not download {{.RUNNER_DOCUMENT_URL}}"
+        exit 1
+      fi
+
+  fixtures:capture:
+    desc: "Capture tests/fixtures/jointfm_1 from a runner of version RUNNER_VERSION serving its tiny checkpoint (task serve:tiny in a runner checkout); URL defaults to http://127.0.0.1:8080 (task fixtures:capture URL=http://127.0.0.1:18080)"
+    vars:
+      URL: '{{.URL | default "http://127.0.0.1:8080"}}'
+    cmd: |
+      if uv run python scripts/capture_fixtures.py --service-url "{{.URL}}" --fixtures tests/fixtures/jointfm_1 --image-version "{{.RUNNER_VERSION}}"; then
+        echo "OK: captured tests/fixtures/jointfm_1 from {{.URL}}"
+      else
+        echo "FAIL: could not capture tests/fixtures/jointfm_1 from {{.URL}}"
+        exit 1
+      fi
+      task leak-guard
 
   max-utilization:
     desc: Send the largest advertised forecast to the configured deployment and print a PASS/FAIL verdict

@@ -1083,9 +1083,12 @@ def test_validate_service_metadata_rejects_model_mismatch() -> None:
         )
 
 
-def test_validate_service_metadata_rejects_unknown_advertised_mode() -> None:
-    """Validate service metadata rejects unknown advertised mode."""
+def test_a_deployment_newer_than_the_client_passes_the_health_check() -> None:
+    """Values a newer service adds pass the health check and stay readable as advertised."""
     metadata = _health_metadata()
+    metadata["decoding_strategy"] = "diffusion"
+    metadata["supported_query_modes"] = ["forecast", "condition", "explain"]
+    metadata["supported_condition_kinds"] = ["equality", "quantile"]
     metadata["supported_return_modes"] = [
         "mean",
         "samples",
@@ -1093,17 +1096,37 @@ def test_validate_service_metadata_rejects_unknown_advertised_mode() -> None:
         "log_prob",
         "median",
     ]
+    metadata["supported_time_index_modes"] = ["ordinal", "event_time"]
+
+    validate_service_metadata(metadata)
+    health = HealthMetadata.from_payload(metadata)
+
+    assert health.decoding_strategy == "diffusion"
+    assert health.supported_query_modes == ("forecast", "condition", "explain")
+    assert health.supported_condition_kinds == ("equality", "quantile")
+    assert "median" in health.supported_return_modes
+    assert health.supported_time_index_modes == ("ordinal", "event_time")
+
+
+def test_a_deployment_serving_fewer_return_modes_passes_the_health_check() -> None:
+    """The service refuses an unserved return mode itself, so health need not list all four."""
+    metadata = _health_metadata()
+    metadata["supported_return_modes"] = ["mean", "samples"]
+
+    validate_service_metadata(metadata)
+
+    assert HealthMetadata.from_payload(metadata).supported_return_modes == (
+        "mean",
+        "samples",
+    )
+
+
+def test_validate_service_metadata_rejects_empty_return_modes() -> None:
+    """A deployment that advertises no return mode answers nothing."""
+    metadata = _health_metadata()
+    metadata["supported_return_modes"] = []
 
     with pytest.raises(UnsupportedServiceContractError, match="supported_return_modes"):
-        validate_service_metadata(metadata)
-
-
-def test_validate_service_metadata_rejects_unknown_decoding_strategy() -> None:
-    """Validate service metadata rejects an unknown decoding strategy."""
-    metadata = _health_metadata()
-    metadata["decoding_strategy"] = "diffusion"
-
-    with pytest.raises(UnsupportedServiceContractError, match="decoding_strategy"):
         validate_service_metadata(metadata)
 
 

@@ -50,9 +50,9 @@ def test_hosted_surface_uses_datarobot_routes_and_auth_headers(
     json_fixture_loader: Callable[[str], dict[str, Any]],
 ) -> None:
     """Hosted surface uses DataRobot routes and auth headers."""
-    request_payload = json_fixture_loader("forecast_mean_request")
-    health_payload = json_fixture_loader("health_metadata")
-    response_payload = json_fixture_loader("forecast_mean_response")
+    request_payload = json_fixture_loader("jointfm_1/forecast_mean_request")
+    health_payload = json_fixture_loader("jointfm_1/health_metadata")
+    response_payload = json_fixture_loader("jointfm_1/forecast_mean_response")
     predict_path = "/deployments/deployment-id/predictionsUnstructured"
     server, handler = _start_surface_server(
         {
@@ -104,9 +104,9 @@ def test_local_surface_uses_direct_service_routes_without_hosted_auth(
     json_fixture_loader: Callable[[str], dict[str, Any]],
 ) -> None:
     """Local surface uses direct service routes without hosted auth."""
-    request_payload = json_fixture_loader("forecast_mean_request")
-    health_payload = json_fixture_loader("health_metadata")
-    response_payload = json_fixture_loader("forecast_mean_response")
+    request_payload = json_fixture_loader("jointfm_1/forecast_mean_request")
+    health_payload = json_fixture_loader("jointfm_1/health_metadata")
+    response_payload = json_fixture_loader("jointfm_1/forecast_mean_response")
     server, handler = _start_surface_server(
         {
             ("GET", "/healthz"): (HTTPStatus.OK, health_payload),
@@ -134,7 +134,7 @@ def test_local_surface_uses_direct_service_routes_without_hosted_auth(
         )
 
         assert health.model_version == request_payload["model_version"]
-        np.testing.assert_array_equal(result.mean, ((12.0,),))
+        np.testing.assert_array_equal(result.mean, response_payload["outputs"]["mean"])
         assert [entry["path"] for entry in handler.requests] == ["/healthz", "/predict"]
         assert "Authorization" not in handler.requests[0]["headers"]
         assert "Authorization" not in handler.requests[1]["headers"]
@@ -148,7 +148,7 @@ def test_local_surface_rejects_samples_below_requested_lower_bound(
     json_fixture_loader: Callable[[str], dict[str, Any]],
 ) -> None:
     """Local surface rejects samples below requested lower bound."""
-    response_payload = json_fixture_loader("forecast_samples_response")
+    response_payload = json_fixture_loader("jointfm_1/forecast_samples_response")
     response_payload["outputs"]["samples"] = [[[-0.5]], [[12.5]]]
     server, handler = _start_surface_server(
         {("POST", "/predict"): (HTTPStatus.OK, response_payload)}
@@ -189,9 +189,9 @@ def test_hosted_surface_auto_discovers_model_version_when_settings_unpinned(
     json_fixture_loader: Callable[[str], dict[str, Any]],
 ) -> None:
     """Hosted surface auto discovers model version when settings unpinned."""
-    request_payload = json_fixture_loader("forecast_mean_request")
-    health_payload = json_fixture_loader("health_metadata")
-    response_payload = json_fixture_loader("forecast_mean_response")
+    request_payload = json_fixture_loader("jointfm_1/forecast_mean_request")
+    health_payload = json_fixture_loader("jointfm_1/health_metadata")
+    response_payload = json_fixture_loader("jointfm_1/forecast_mean_response")
     predict_path = "/deployments/deployment-id/predictionsUnstructured"
     server, handler = _start_surface_server(
         {

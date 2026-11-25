@@ -30,6 +30,7 @@ from jointfm_client import (
     MeanForecastResult,
     QuantileForecastResult,
     SampleForecastResult,
+    SUPPORTED_RETURN_MODES,
     validate_service_metadata,
 )
 
@@ -38,7 +39,7 @@ def test_health_fixture_matches_current_service_contract(
     json_fixture_loader: Callable[[str], dict[str, Any]],
 ) -> None:
     """The checked-in health fixture parses under the SDK's current contract."""
-    payload = json_fixture_loader("health_metadata")
+    payload = json_fixture_loader("jointfm_1/health_metadata")
     expected_model_version = payload["model_version"]
     assert isinstance(expected_model_version, str)
 
@@ -50,44 +51,40 @@ def test_health_fixture_matches_current_service_contract(
 
     assert metadata.schema_version == SCHEMA_VERSION
     assert metadata.decoding_strategy == "parallel_dense"
-    assert metadata.supported_return_modes == (
-        "mean",
-        "samples",
-        "quantiles",
-        "log_prob",
-    )
+    # The service lists its modes in an order of its own.
+    assert set(metadata.supported_return_modes) == set(SUPPORTED_RETURN_MODES)
 
 
 @pytest.mark.parametrize(
     ("request_fixture", "response_fixture", "result_type", "return_mode"),
     [
         (
-            "forecast_mean_request",
-            "forecast_mean_response",
+            "jointfm_1/forecast_mean_request",
+            "jointfm_1/forecast_mean_response",
             MeanForecastResult,
             "mean",
         ),
         (
-            "forecast_samples_request",
-            "forecast_samples_response",
+            "jointfm_1/forecast_samples_request",
+            "jointfm_1/forecast_samples_response",
             SampleForecastResult,
             "samples",
         ),
         (
-            "forecast_quantiles_request",
-            "forecast_quantiles_response",
+            "jointfm_1/forecast_quantiles_request",
+            "jointfm_1/forecast_quantiles_response",
             QuantileForecastResult,
             "quantiles",
         ),
         (
-            "forecast_log_prob_request",
-            "forecast_log_prob_response",
+            "jointfm_1/forecast_log_prob_request",
+            "jointfm_1/forecast_log_prob_response",
             LogProbResult,
             "log_prob",
         ),
         (
-            "condition_log_prob_request",
-            "condition_log_prob_response",
+            "jointfm_1/condition_log_prob_request",
+            "jointfm_1/condition_log_prob_response",
             LogProbResult,
             "log_prob",
         ),
@@ -117,22 +114,22 @@ def test_checked_in_fixture_payloads_parse_as_forecast_results(
     ("fixture_name", "error_code", "message_fragment"),
     [
         (
-            "validation_error_response",
+            "jointfm_1/validation_error_response",
             "VALIDATION_ERROR",
             "query_times must not be empty",
         ),
         (
-            "schema_version_mismatch_response",
+            "jointfm_1/schema_version_mismatch_response",
             "SCHEMA_VERSION_MISMATCH",
             "Unsupported schema_version",
         ),
         (
-            "model_version_mismatch_response",
+            "jointfm_1/model_version_mismatch_response",
             "MODEL_VERSION_MISMATCH",
             "Unsupported model_version",
         ),
         (
-            "input_size_exceeded_response",
+            "jointfm_1/input_size_exceeded_response",
             "INPUT_SIZE_EXCEEDED",
             "n_samples exceeds the configured container cap",
         ),
