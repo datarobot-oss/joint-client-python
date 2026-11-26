@@ -5,9 +5,10 @@ silent: true
 
 vars:
   TYPOS_VERSION: '{{.TYPOS_VERSION | default "1.45.1"}}'
-  # The runner release whose wire contract this SDK speaks: contract:sync copies
-  # that release's OpenAPI document, and fixtures:capture refuses a service of
-  # any other version.
+  # The runner version whose wire contract this SDK speaks: contract:sync copies
+  # its OpenAPI document, and fixtures:capture refuses a service of any other
+  # version. A version with a local label (after "+") has no public tag, so its
+  # document comes from a path (task contract:sync DOCUMENT=<path>).
   RUNNER_VERSION: 0.10.2
   RUNNER_DOCUMENT_URL: https://raw.githubusercontent.com/datarobot-oss/joint-inference-python/v{{.RUNNER_VERSION}}/src/jointfm_inference/model/service/wire_schema/openapi.json
   # Scanner images: docker resolves the digest and ignores the tag, which is kept for readers.
@@ -134,17 +135,34 @@ tasks:
     cmd: uv run pytest -n auto
 
   contract:sync:
-    desc: Copy the OpenAPI document of the runner release RUNNER_VERSION names into the package; capture the fixtures again afterwards
+    desc: "Copy the OpenAPI document of the runner version RUNNER_VERSION names into the package, from its public tag or from DOCUMENT, the document of a runner tree of that version (task contract:sync DOCUMENT=<path>); capture the fixtures again afterwards"
+    vars:
+      DOCUMENT: '{{.DOCUMENT | default ""}}'
     cmd: |
-      if curl --fail --silent --show-error --location "{{.RUNNER_DOCUMENT_URL}}" --output src/jointfm_client/openapi.json; then
-        echo "OK: copied the OpenAPI document of runner {{.RUNNER_VERSION}}"
+      if [ -n "{{.DOCUMENT}}" ]; then
+        if cp "{{.DOCUMENT}}" src/jointfm_client/openapi.json; then
+          echo "OK: copied the OpenAPI document of runner {{.RUNNER_VERSION}} from {{.DOCUMENT}}"
+        else
+          echo "FAIL: could not copy {{.DOCUMENT}}"
+          exit 1
+        fi
       else
-        echo "FAIL: could not download {{.RUNNER_DOCUMENT_URL}}"
-        exit 1
+        case "{{.RUNNER_VERSION}}" in
+          *+*)
+            echo "FAIL: runner {{.RUNNER_VERSION}} carries a local version label and has no public tag; pass DOCUMENT=<path> to the OpenAPI document of a runner tree of that version"
+            exit 1
+            ;;
+        esac
+        if curl --fail --silent --show-error --location "{{.RUNNER_DOCUMENT_URL}}" --output src/jointfm_client/openapi.json; then
+          echo "OK: copied the OpenAPI document of runner {{.RUNNER_VERSION}}"
+        else
+          echo "FAIL: could not download {{.RUNNER_DOCUMENT_URL}}"
+          exit 1
+        fi
       fi
 
   fixtures:capture:
-    desc: "Capture tests/fixtures/jointfm_1 from a runner of version RUNNER_VERSION serving its tiny checkpoint (task serve:tiny in a runner checkout); URL defaults to http://127.0.0.1:8080 (task fixtures:capture URL=http://127.0.0.1:18080)"
+    desc: "Capture tests/fixtures/jointfm_1 from a running runner of version RUNNER_VERSION serving its tiny checkpoint (task serve:tiny in a runner tree of that version); URL defaults to http://127.0.0.1:8080 (task fixtures:capture URL=http://127.0.0.1:18080)"
     vars:
       URL: '{{.URL | default "http://127.0.0.1:8080"}}'
     cmd: |

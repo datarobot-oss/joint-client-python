@@ -22,7 +22,7 @@ from dataclasses import dataclass, replace
 from itertools import accumulate
 from pathlib import Path
 import re
-from typing import Any, Self, cast
+from typing import Any, Final, Self, cast
 from urllib.parse import urlparse
 
 import numpy as np
@@ -56,6 +56,7 @@ from jointfm_client.contract import (
     validate_service_metadata,
 )
 from jointfm_client.exceptions import (
+    JointFMCapacityError,
     JointFMConfigurationError,
     JointFMHTTPStatusError,
     JointFMServiceError,
@@ -96,11 +97,19 @@ from jointfm_client.transport import (
     JointFMHTTPTransport,
     JointFMRetryConfig,
     JointFMTimeoutConfig,
+    encode_json_body,
 )
 
 _SAMPLE_CAP_ERROR_PATTERN = re.compile(
     r"n_samples exceeds the configured container cap:\s*"
     r"requested\s+(?P<requested>[0-9]+),\s*max\s+(?P<cap>[0-9]+)"
+)
+# The request lists a size refusal names, each with its label in the message.
+_REQUEST_SHAPE_LISTS: Final[tuple[tuple[str, str], ...]] = (
+    ("columns", "columns"),
+    ("history_rows", "history rows"),
+    ("query_times", "query times"),
+    ("query_rows", "query rows"),
 )
 
 
@@ -961,8 +970,9 @@ class JointFMClient:
         The deployment advertises its sampling budget as ``max_sample_count`` in
         `/healthz`, so an explicit sample request probes health once and batches
         locally instead of sending a request the service is guaranteed to reject.
-        The cap is remembered for the client's lifetime. Clients configured
-        without a reachable health route fall back to learning the cap from the
+        The cap is remembered for the client's lifetime, and the probe is cached
+        because the request-size check before each upload reads it too. Clients
+        configured without a reachable health route fall back to learning the cap from the
         service's ``INPUT_SIZE_EXCEEDED`` response. Returns ``None`` when the
         request goes out as one prediction.
         """
@@ -970,7 +980,7 @@ class JointFMClient:
         if requested_samples is None:
             return None
         if self._sample_batch_cap is None and self._health_route_configured():
-            self.health()
+            self.health(cache=True)
         if self._sample_batch_cap is None:
             return None
         batch_sizes = self._sample_batch_sizes(
@@ -1024,6 +1034,8 @@ class JointFMClient:
         merger: _SampleBatchMerger,
     ) -> None:
         pool = self._require_pool()
+        for batch_payload in batch_payloads:
+            self._require_body_within_cap(batch_payload)
         # Batches beyond the peer count queue on the per-peer POST lock, so no
         # peer ever serves two of this client's batches at once.
         max_workers = min(len(batch_payloads), pool.instance_count)
@@ -1065,10 +1077,38 @@ class JointFMClient:
         return batch_result
 
     def _post_predict_json(self, payload: Mapping[str, Any]) -> Mapping[str, Any]:
+        self._require_body_within_cap(payload)
         if self._uses_pool():
             return self._require_pool().post_json(payload)
         predict_url = self._require_predict_url("predict")
         return self._transport_for_request().post_json(predict_url, payload)
+
+    def _require_body_within_cap(self, payload: Mapping[str, Any]) -> None:
+        """Refuse ``payload`` before the upload when its body exceeds the advertised cap.
+
+        The cap is ``max_request_bytes`` of the cached health probe, the
+        smallest across a pool's peers. A deployment that does not advertise
+        it, or a client without a health route, gets no local check, and the
+        service stays the authority on what it reads. The body is encoded here
+        to be measured and once more by the transport, because the
+        ``JSONTransport`` interface takes the payload, not its bytes.
+
+        Raises:
+            JointFMCapacityError: when the encoded body is larger than the cap;
+                the message names both sizes and the request's list lengths.
+        """
+        if not self._health_route_configured():
+            return
+        max_request_bytes = self.health(cache=True).max_request_bytes
+        if max_request_bytes is None:
+            return
+        body_bytes = len(encode_json_body(payload))
+        if body_bytes > max_request_bytes:
+            raise JointFMCapacityError(
+                f"request body of {body_bytes} bytes exceeds the deployment's "
+                f"max_request_bytes {max_request_bytes} ({_request_shape(payload)}); "
+                "send fewer history rows, query times, or columns"
+            )
 
     def _uses_pool(self) -> bool:
         return self.settings is not None and len(self.settings.instances) > 1
@@ -1372,6 +1412,15 @@ def _sample_batch_cap_from_error(
     if requested_samples <= sample_cap:
         return None
     return sample_cap
+
+
+def _request_shape(payload: Mapping[str, Any]) -> str:
+    """Name the length of every request list that drives the body size."""
+    return ", ".join(
+        f"{len(payload[key])} {label}"
+        for key, label in _REQUEST_SHAPE_LISTS
+        if isinstance(payload.get(key), Sequence)
+    )
 
 
 def _requested_sample_count(payload: Mapping[str, Any]) -> int | None:

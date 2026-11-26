@@ -133,6 +133,11 @@ def test_checked_in_fixture_payloads_parse_as_forecast_results(
             "INPUT_SIZE_EXCEEDED",
             "n_samples exceeds the configured container cap",
         ),
+        (
+            "jointfm_1/request_body_too_large_response",
+            "INPUT_SIZE_EXCEEDED",
+            "exceeds the service's max_request_bytes",
+        ),
     ],
 )
 def test_checked_in_error_fixtures_raise_typed_service_errors(

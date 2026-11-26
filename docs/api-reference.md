@@ -81,13 +81,14 @@ All SDK-specific exceptions inherit from `JointFMError`.
 | Name | Raised When |
 | --- | --- |
 | `JointFMConfigurationError` | Local settings, credentials, URLs, deployment selection, or request configuration are invalid. |
-| `JointFMCapacityError` | Forecast inputs exceed the deployed checkpoint's advertised data-generation capacity, or the service-health payload does not advertise a `data_generation` block. |
+| `JointFMCapacityError` | Forecast inputs exceed the deployed checkpoint's advertised data-generation capacity, the service-health payload does not advertise a `data_generation` block, or a request body exceeds the `max_request_bytes` the deployment advertises (the smallest across a pool's instances), raised before any byte is uploaded with a message naming both sizes and the request's column, history-row, and query-time counts. A deployment that does not advertise the cap gets no such check. |
 | `JointFMTransportError` | Base class for transport failures. |
-| `JointFMRequestEncodingError` | A request payload cannot be JSON encoded. |
+| `JointFMRequestEncodingError` | A request payload cannot be JSON encoded, including a `NaN` or infinite value, which JSON cannot spell; it is raised once, before any attempt. |
 | `JointFMRequestError` | A network request fails before a usable response is received. |
 | `JointFMResponseError` | Base class for malformed or unsuccessful service responses. It preserves `status_code`, `response_body_excerpt`, optional `datarobot_request_id`, and structured JointFM errors. |
 | `JointFMResponseDecodeError` | A service response is empty or whitespace-only, is not strict JSON (including a body with `NaN` or `Infinity` tokens), or is not a JSON object. |
 | `JointFMHTTPStatusError` | The service returns an HTTP error status. |
+| `JointFMInputSizeExceededError` | A `JointFMHTTPStatusError` for an `INPUT_SIZE_EXCEEDED` answer: a body above `max_request_bytes` (HTTP 413), more samples than `max_sample_count`, or more columns than `max_series`. Its `field`, `requested`, and `allowed` name the refused input, its size, and the service's limit (`None` when the service does not send them). It is never retried. |
 | `JointFMServiceError` | A response body contains non-empty JointFM `errors`, including the case where HTTP status unexpectedly succeeded. |
 | `JointFMCompatibilityError` | Base class for fail-fast service compatibility failures. |
 | `UnsupportedSchemaVersionError` | The service or response advertises a schema version other than `v6`. |
@@ -276,7 +277,7 @@ A table request carries `schema_version`, `model_version`, `query_mode` (`"forec
 | `time_index_encoding` | Time-index encoding advertised by the service. |
 | `supported_metadata_traits` | Expert-hint traits the mounted model reads; empty when it reads none. A deployment that does not send the field predates hints and parses as supporting none. Forecasts with a `traits` entry outside this list are refused locally. |
 | `max_sample_count` | Maximum sample-count budget the service accepts in a single prediction. The client reads it during health probes and batches oversized sample requests locally, so the service never has to reject them. |
-| `max_request_bytes` | Largest request body, in bytes, the service reads; a larger one is refused unread with `INPUT_SIZE_EXCEEDED`. `None` from a deployment that does not send it. |
+| `max_request_bytes` | Largest request body, in bytes, the service reads; a larger one is refused unread with `INPUT_SIZE_EXCEEDED`. The client refuses a larger body with `JointFMCapacityError` before uploading it. `None` from a deployment that does not send it. |
 | `sample_row_draws` | JointFM 2 deployments: answered rows times draws one sampling pass holds; a request needing more is drawn in several passes, and a `seed` repeats an answer only under the same value. `None` from a deployment that does not send it. |
 | `max_concurrent_requests` | How many prediction requests the container serves at once; a further request waits for a free slot. `run_max_utilization_check` fills every slot; the forecast helpers send at most one request per endpoint at a time. |
 | `data_generation` | Optional capability block describing the deployed checkpoint's advertised data-generation capacity. Absent on legacy checkpoints; present payloads expose `min_series`, `max_series`, `t_input`, `t_output`, `n_input`, and `n_output`. |

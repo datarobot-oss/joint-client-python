@@ -1,0 +1,12 @@
+{
+  "errors": [
+    {
+      "allowed": 111104,
+      "code": "INPUT_SIZE_EXCEEDED",
+      "field": "Content-Length",
+      "message": "request body of 144325 bytes exceeds the service's max_request_bytes 111104; /healthz advertises the cap",
+      "requested": 144325
+    }
+  ],
+  "schema_version": "v6"
+}

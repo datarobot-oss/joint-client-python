@@ -194,7 +194,7 @@ check passes advertised values the SDK does not know and refuses only another
 terms, not what keeps their client running.
 
 - `src/jointfm_client/openapi.json` is the runner's OpenAPI document of the
-  release that `RUNNER_VERSION` in the [Taskfile](Taskfile.yaml) names, copied
+  version that `RUNNER_VERSION` in the [Taskfile](Taskfile.yaml) names, copied
   by `task contract:sync`; `openapi_document()` returns it. Never edit it by
   hand.
 - `tests/fixtures/<service>/` holds one service's fixtures: `jointfm_1/` the
@@ -206,12 +206,19 @@ terms, not what keeps their client running.
   term of the document the SDK does not read, and while a `jointfm_1/` fixture
   is not a body the document describes.
 
-To follow a runner release:
+A deployment can serve a runner version that no public release holds: its
+version carries a local version label after a `+`, which PyPI refuses. The
+SDK follows such a version from a runner tree at it, because `task
+contract:sync` copies the document from the path `DOCUMENT` names instead of
+downloading it from a public tag, and refuses a labeled version without one.
+
+To follow a runner version:
 
 ```sh
-# in this checkout: set RUNNER_VERSION in Taskfile.yaml, then
-task contract:sync
-# in a runner checkout at that release's tag, from a second shell
+# in this checkout: set RUNNER_VERSION in Taskfile.yaml, then either
+task contract:sync                    # a public release: downloads its tag's document
+task contract:sync DOCUMENT=<runner tree>/src/jointfm_inference/model/service/wire_schema/openapi.json
+# in a runner tree at that version, from a second shell
 JOINTFM_INFERENCE_PORT=8080 task serve:tiny
 # back in this checkout
 task fixtures:capture

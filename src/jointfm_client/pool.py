@@ -243,6 +243,15 @@ class PoolHealthGate:
             max_concurrent_requests=min(
                 peer_metadata.max_concurrent_requests for _, peer_metadata in healthy
             ),
+            # A request may go to any peer, so the smallest advertised cap binds.
+            max_request_bytes=min(
+                (
+                    peer_metadata.max_request_bytes
+                    for _, peer_metadata in healthy
+                    if peer_metadata.max_request_bytes is not None
+                ),
+                default=None,
+            ),
         )
         return HealthProbeResult(
             metadata=metadata,

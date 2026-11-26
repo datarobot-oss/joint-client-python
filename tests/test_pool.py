@@ -187,6 +187,29 @@ def test_pool_health_rejects_mismatch_and_aligns_sample_cap() -> None:
     assert metadata.max_sample_count == 40
 
 
+@pytest.mark.parametrize(
+    ("caps", "expected"),
+    [((900, 300, None), 300), ((None, None, None), None)],
+)
+def test_pool_health_binds_the_smallest_advertised_request_cap(
+    caps: tuple[int | None, ...], expected: int | None
+) -> None:
+    """Any peer may receive a request, so the smallest cap any peer advertises applies."""
+    health_by_id: dict[str, Mapping[str, Any]] = {}
+    for deployment_id, cap in zip("abc", caps, strict=True):
+        health = _health()
+        if cap is not None:
+            health["max_request_bytes"] = cap
+        health_by_id[deployment_id] = health
+
+    metadata = _pool(
+        instances=tuple(_instance(deployment_id) for deployment_id in "abc"),
+        transport=_Transport(health_by_id=health_by_id),
+    ).probe_all_health()
+
+    assert metadata.max_request_bytes == expected
+
+
 def test_health_instances_sums_caps_and_builds_topology() -> None:
     """Reachable caps sum and group into a compact topology label."""
     result = _pool(

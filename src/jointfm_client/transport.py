@@ -20,6 +20,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
+import json
 import math
 from typing import Any, Final, Protocol
 
@@ -40,10 +41,15 @@ from jointfm_client.configuration import (
     DEFAULT_RETRY_STATUS_CODES,
     USER_AGENT_HEADER,
 )
-from jointfm_client.contract import DISTRIBUTION_NAME, PACKAGE_VERSION
+from jointfm_client.contract import (
+    DISTRIBUTION_NAME,
+    PACKAGE_VERSION,
+    StructuredError,
+)
 from jointfm_client.exceptions import (
     JointFMConfigurationError,
     JointFMHTTPStatusError,
+    JointFMInputSizeExceededError,
     JointFMRequestEncodingError,
     JointFMRequestError,
     JointFMResponseDecodeError,
@@ -52,6 +58,29 @@ from jointfm_client.settings import JointFMSettings, build_datarobot_prediction_
 
 RETRYABLE_METHODS: Final = frozenset(DEFAULT_RETRYABLE_METHODS)
 RETRY_AFTER_HEADER: Final = "Retry-After"
+CONTENT_TYPE_HEADER: Final = "Content-Type"
+JSON_CONTENT_TYPE: Final = "application/json"
+INPUT_SIZE_EXCEEDED_CODE: Final = "INPUT_SIZE_EXCEEDED"
+_COMPACT_JSON_SEPARATORS: Final = (",", ":")
+
+
+def encode_json_body(payload: Mapping[str, Any]) -> bytes:
+    """Return the UTF-8 JSON bytes the HTTP transport sends for ``payload``.
+
+    The client measures a request against the advertised ``max_request_bytes``
+    with this encoding, so the size it checks is the size it sends.
+
+    Raises:
+        JointFMRequestEncodingError: when ``payload`` holds a value JSON cannot
+            spell, such as an object of another type, NaN, or an infinity.
+    """
+    try:
+        text = json.dumps(payload, allow_nan=False, separators=_COMPACT_JSON_SEPARATORS)
+    except (TypeError, ValueError) as error:
+        raise JointFMRequestEncodingError(
+            f"JointFM request payload must be JSON-serializable: {error}"
+        ) from error
+    return text.encode("utf-8")
 
 
 def _require_positive_finite(value: float, field: str) -> None:
@@ -145,6 +174,7 @@ class JointFMHTTPTransport:
         """Configure one session with headers, timeouts, retries, and user-agent."""
         self._session = session or requests.Session()
         self._headers = _headers_with_user_agent(headers or {}, user_agent)
+        self._body_headers = {CONTENT_TYPE_HEADER: JSON_CONTENT_TYPE, **self._headers}
         self._timeout = timeout
         self._retry_config = retry_config
         self._response_body_excerpt_characters = _require_positive_integer(
@@ -205,10 +235,12 @@ class JointFMHTTPTransport:
         *,
         payload: Mapping[str, Any] | None = None,
     ) -> Mapping[str, Any]:
+        # Encoded once, so every attempt sends the same bytes without re-encoding.
+        body = None if payload is None else encode_json_body(payload)
         retry_cfg = self._retry_config
         method_is_retryable = method in frozenset(retry_cfg.allowed_methods)
         if retry_cfg.max_attempts <= 1 or not method_is_retryable:
-            return self._request_json_once(method, url, payload=payload)
+            return self._request_json_once(method, url, body=body)
 
         retrying = Retrying(
             stop=stop_after_attempt(retry_cfg.max_attempts),
@@ -222,27 +254,23 @@ class JointFMHTTPTransport:
             retry=_build_retry_predicate(retry_cfg),
             reraise=True,
         )
-        return retrying(self._request_json_once, method, url, payload=payload)
+        return retrying(self._request_json_once, method, url, body=body)
 
     def _request_json_once(
         self,
         method: str,
         url: str,
         *,
-        payload: Mapping[str, Any] | None = None,
+        body: bytes | None,
     ) -> Mapping[str, Any]:
         try:
             response = self._session.request(
                 method,
                 url,
-                headers=self._headers,
-                json=payload,
+                headers=self._headers if body is None else self._body_headers,
+                data=body,
                 timeout=self._timeout.as_requests_timeout(),
             )
-        except TypeError as error:
-            raise JointFMRequestEncodingError(
-                "JointFM request payload must be JSON-serializable"
-            ) from error
         except requests.RequestException as error:
             raise JointFMRequestError(
                 f"JointFM HTTP request failed: {error}"
@@ -438,20 +466,35 @@ def _http_status_error(
     message = f"JointFM service returned HTTP {status_code}"
     if first_error_message is not None:
         message = f"{message}: {first_error_message}"
+    response_body_excerpt = _response_body_excerpt(
+        response,
+        response_body_excerpt_characters,
+    )
+    datarobot_request_id = _datarobot_request_id(response, datarobot_request_id_headers)
+    retry_after_seconds = _parse_retry_after_header(
+        response.headers.get(RETRY_AFTER_HEADER)
+    )
+    for jointfm_error in jointfm_errors:
+        if jointfm_error.get("code") == INPUT_SIZE_EXCEEDED_CODE:
+            refusal = StructuredError.from_payload(jointfm_error)
+            return JointFMInputSizeExceededError(
+                message,
+                status_code=status_code,
+                response_body_excerpt=response_body_excerpt,
+                field=refusal.field,
+                requested=refusal.requested,
+                allowed=refusal.allowed,
+                datarobot_request_id=datarobot_request_id,
+                jointfm_errors=jointfm_errors,
+                retry_after_seconds=retry_after_seconds,
+            )
     return JointFMHTTPStatusError(
         message,
         status_code=status_code,
-        response_body_excerpt=_response_body_excerpt(
-            response,
-            response_body_excerpt_characters,
-        ),
-        datarobot_request_id=_datarobot_request_id(
-            response, datarobot_request_id_headers
-        ),
+        response_body_excerpt=response_body_excerpt,
+        datarobot_request_id=datarobot_request_id,
         jointfm_errors=jointfm_errors,
-        retry_after_seconds=_parse_retry_after_header(
-            response.headers.get(RETRY_AFTER_HEADER)
-        ),
+        retry_after_seconds=retry_after_seconds,
     )
 
 
