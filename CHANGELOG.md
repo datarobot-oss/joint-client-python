@@ -10,6 +10,12 @@ Releases are cut with `task release`, which uses Commitizen to read
 release tag, infer the next SemVer bump, prepend the new section here,
 commit the bump, and create an annotated tag.
 
+## v0.17.1 (2026-11-26)
+
+### Fix
+
+- Speak the wire contract of runner 0.10.2 by moving RUNNER_VERSION to 0.10.2 and copying its OpenAPI document with task contract:sync, so openapi_document() now says that data_generation.min_series describes the training data and limits no request, that max_series is the most columns one request may declare, and that more columns answer INPUT_SIZE_EXCEEDED with requested and allowed counted in columns; and recapture the fixtures from a 0.10.2 service, which moves only the interval condition's effective_sample_size in its last digits
+
 ## v0.17.0 (2026-11-25)
 
 ### Feat
