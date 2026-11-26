@@ -8,7 +8,7 @@ vars:
   # The runner release whose wire contract this SDK speaks: contract:sync copies
   # that release's OpenAPI document, and fixtures:capture refuses a service of
   # any other version.
-  RUNNER_VERSION: 0.10.1
+  RUNNER_VERSION: 0.10.2
   RUNNER_DOCUMENT_URL: https://raw.githubusercontent.com/datarobot-oss/joint-inference-python/v{{.RUNNER_VERSION}}/src/jointfm_inference/model/service/wire_schema/openapi.json
   # Scanner images: docker resolves the digest and ignores the tag, which is kept for readers.
   GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f

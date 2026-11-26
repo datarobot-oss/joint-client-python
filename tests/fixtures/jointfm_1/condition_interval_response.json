@@ -5,7 +5,7 @@
     "history_rows": 2,
     "horizon_count": 2,
     "interval_estimator": {
-      "effective_sample_size": 16369.49528758081,
+      "effective_sample_size": 16369.495287639897,
       "points": 16384
     },
     "seed": 7

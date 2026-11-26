@@ -940,7 +940,7 @@
               "$ref": "#/components/schemas/ColumnDescriptor"
             },
             "minItems": 1,
-            "description": "The columns of every row, in the order the response reports them by default. `/healthz` reports the column counts the model was built for in `data_generation`."
+            "description": "The columns of every row, in the order the response reports them by default. More columns than `/healthz` reports as `data_generation.max_series` are refused with `INPUT_SIZE_EXCEEDED`."
           },
           "requested_columns": {
             "anyOf": [
@@ -2456,12 +2456,12 @@
           "min_series": {
             "type": "integer",
             "minimum": 0,
-            "description": "The fewest columns the model was built for."
+            "description": "The fewest columns a training sample of the model carried. It describes the training data and limits no request: one column is enough."
           },
           "max_series": {
             "type": "integer",
             "minimum": 0,
-            "description": "The most columns the model was built for."
+            "description": "The most columns the model was built for, and the most one request may declare."
           },
           "t_input": {
             "type": "number",
@@ -2509,7 +2509,7 @@
               "MODEL_VERSION_MISMATCH",
               "INTERNAL_ERROR"
             ],
-            "description": "What went wrong, as a value a client can branch on.\n\n- `VALIDATION_ERROR`: The request is malformed, asks for something the service does not serve, or asks for values the forecast puts almost no probability on, such as draws inside a column bound far from it; `field` names the offending field.\n- `UNSUPPORTED_HEAD_QUERY_COMBINATION`: In the catalog but not sent by this service: the mounted head answers every `query_mode`.\n- `UNSUPPORTED_RETURN_MODE`: In the catalog but not sent by this service: an unserved `return_mode` answers `VALIDATION_ERROR`.\n- `INPUT_SIZE_EXCEEDED`: The request exceeds a service cap: `n_samples` above `max_sample_count`, or a body above `max_request_bytes`. `requested` and `allowed` carry both sizes.\n- `SCHEMA_VERSION_MISMATCH`: `schema_version` differs from the version the service speaks.\n- `MODEL_VERSION_MISMATCH`: `model_version` differs from the version the service serves.\n- `INTERNAL_ERROR`: The service failed on a request it accepted."
+            "description": "What went wrong, as a value a client can branch on.\n\n- `VALIDATION_ERROR`: The request is malformed, asks for something the service does not serve, or asks for values the forecast puts almost no probability on, such as draws inside a column bound far from it; `field` names the offending field.\n- `UNSUPPORTED_HEAD_QUERY_COMBINATION`: In the catalog but not sent by this service: the mounted head answers every `query_mode`.\n- `UNSUPPORTED_RETURN_MODE`: In the catalog but not sent by this service: an unserved `return_mode` answers `VALIDATION_ERROR`.\n- `INPUT_SIZE_EXCEEDED`: The request exceeds a service cap: `n_samples` above `max_sample_count`, more `columns` than `data_generation.max_series`, or a body above `max_request_bytes`. `requested` and `allowed` carry both sizes.\n- `SCHEMA_VERSION_MISMATCH`: `schema_version` differs from the version the service speaks.\n- `MODEL_VERSION_MISMATCH`: `model_version` differs from the version the service serves.\n- `INTERNAL_ERROR`: The service failed on a request it accepted."
           },
           "message": {
             "type": "string",
@@ -2529,7 +2529,7 @@
           "requested": {
             "type": "integer",
             "minimum": 0,
-            "description": "The size the request asked for, in the unit of `field`: samples for `n_samples`, bytes for `Content-Length`."
+            "description": "The size the request asked for, in the unit of `field`: samples for `n_samples`, columns for `columns`, bytes for `Content-Length`."
           },
           "allowed": {
             "type": "integer",
